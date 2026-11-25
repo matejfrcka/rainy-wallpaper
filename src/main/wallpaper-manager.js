@@ -11,9 +11,11 @@ const win32 = require('./win32');
 const isWin = process.platform === 'win32';
 
 class WallpaperManager {
-  constructor({ preload, onLightning }) {
+  constructor({ preload, log = () => {}, onStatus = () => {} }) {
     this.preload = preload;
-    this.onLightning = onLightning;
+    this.log = log;
+    this.onStatus = onStatus;
+    this.attach = { mode: null, error: null, failures: 0 };
     this.windows = new Map();      // displayId -> BrowserWindow
     this.enabled = false;
     this.suspended = false;
@@ -89,15 +91,34 @@ class WallpaperManager {
         query: { display: String(display.id), primary: isPrimary ? '1' : '0' },
       });
 
-      win.once('ready-to-show', () => {
-        let attached = false;
-        if (isWin) attached = win32.attachToDesktop(win.getNativeWindowHandle(), rects[i], origin);
-        win.showInactive();
-        if (!attached) {
-          win.setBounds(display.bounds);
-          win32.sendToBottom(win.getNativeWindowHandle());
+      win.once('ready-to-show', async () => {
+        if (!isWin) { win.showInactive(); this.sendState(win); return; }
+        const handle = win.getNativeWindowHandle();
+        const host = await win32.attachToDesktop(handle, rects[i], origin, this.log);
+        if (win.isDestroyed()) return;
+        if (!host) {
+          // Never show a window that would cover the desktop icons.
+          this.attach.failures++;
+          this.attach.mode = 'failed';
+          this.attach.error = 'Could not place the wallpaper behind the desktop icons.';
+          this.log(`display ${display.id}: attach failed (#${this.attach.failures})`);
+          win.__intentionalClose = true;
+          win.destroy();
+          this.windows.delete(display.id);
+          if (this.attach.failures <= 3) this.scheduleRebuild(3000);
+          this.onStatus();
+          return;
         }
+        this.attach.mode = host.mode;
+        this.attach.error = null;
+        this.attach.failures = 0;
+        win.showInactive();
+        win32.restack(host);
+        setTimeout(() => !win.isDestroyed() && win32.restack(host), 1000);
+        win.__host = host;
+        this.log(`display ${display.id}: attached (${host.mode}) ${rects[i].width}x${rects[i].height}`);
         this.sendState(win);
+        this.onStatus();
       });
 
       // Explorer restart destroys our parent → our window dies: rebuild.
@@ -105,8 +126,6 @@ class WallpaperManager {
         this.windows.delete(display.id);
         if (!win.__intentionalClose && this.enabled && !this.closing) this.scheduleRebuild(2000);
       });
-      // Keep fallback windows from popping above other apps.
-      win.on('focus', () => win32.sendToBottom(win.getNativeWindowHandle()));
       win.webContents.on('render-process-gone', () => this.scheduleRebuild(1500));
 
       this.windows.set(display.id, win);

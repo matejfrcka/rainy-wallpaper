@@ -3,6 +3,8 @@
  * Rainy Glass Wallpaper Engine – main process.
  * Owns settings, the tray, the settings window and the per-monitor wallpaper windows.
  */
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell } = require('electron');
 const { SettingsStore } = require('./settings-store');
@@ -26,12 +28,27 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(init);
 }
 
-let store, wallpapers, monitor, tray, settingsWin;
+let store, wallpapers, monitor, tray, settingsWin, logFile;
 const status = { suspended: false, reason: null, paused: false, fps: 0, error: null };
+
+/** Diagnostic log: %APPDATA%\\Rainy Glass Wallpaper Engine\\rainy-glass.log */
+function log(msg) {
+  const line = `[${new Date().toISOString()}] ${msg}\n`;
+  try { fs.appendFileSync(logFile, line); } catch { /* ignore */ }
+  console.log(line.trimEnd());
+}
+
+function fullStatus() {
+  return { ...status, paused: wallpapers.paused, displays: wallpapers.displays(), enabled: wallpapers.enabled, attach: wallpapers.attach };
+}
 
 function init() {
   store = new SettingsStore(app.getPath('userData'));
-  wallpapers = new WallpaperManager({ preload: PRELOAD });
+  logFile = path.join(app.getPath('userData'), 'rainy-glass.log');
+  try { fs.writeFileSync(logFile, ''); } catch { /* ignore */ }
+  log(`start v${app.getVersion()} ${process.platform} ${os.release()} electron ${process.versions.electron}`);
+  log(`win32 integration: ${require('./win32').isAvailable() ? 'ok' : 'unavailable'}`);
+  wallpapers = new WallpaperManager({ preload: PRELOAD, log, onStatus: () => pushStatus() });
   monitor = new SystemMonitor({
     getSettings: () => store.get(),
     getOwnHandles: () => wallpapers.ownHandles(),
@@ -95,7 +112,7 @@ function sendToSettings(channel, ...args) {
 
 function pushStatus() {
   status.paused = wallpapers.paused;
-  sendToSettings('status:changed', { ...status, displays: wallpapers.displays(), enabled: wallpapers.enabled });
+  sendToSettings('status:changed', fullStatus());
   updateTrayMenu();
 }
 
@@ -177,7 +194,7 @@ function registerIpc() {
   ipcMain.handle('state:get', () => ({
     settings: store.get(),
     presets: store.presets(),
-    status: { ...status, paused: wallpapers.paused, displays: wallpapers.displays(), enabled: wallpapers.enabled },
+    status: fullStatus(),
     version: app.getVersion(),
     platform: process.platform,
     formats: images.EXTENSIONS,
@@ -217,13 +234,15 @@ function registerIpc() {
   ipcMain.on('wallpaper:lightning', (e, distance) => wallpapers.relayLightning(e.sender.id, Number(distance) || 0.5));
   ipcMain.on('wallpaper:fps', (_e, fps) => {
     status.fps = Number(fps) || 0;
-    sendToSettings('status:changed', { ...status, paused: wallpapers.paused, displays: wallpapers.displays(), enabled: wallpapers.enabled });
+    sendToSettings('status:changed', fullStatus());
   });
   ipcMain.on('wallpaper:error', (_e, msg) => {
     status.error = msg;
-    console.error('[wallpaper]', msg);
+    log('[wallpaper] ' + msg);
     pushStatus();
   });
+
+  ipcMain.handle('log:open', () => shell.showItemInFolder(logFile));
 
   ipcMain.handle('export:we', async () => {
     const res = await dialog.showOpenDialog(settingsWin, {

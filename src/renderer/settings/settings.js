@@ -306,8 +306,11 @@
 
   /* ------------------------------------------------ custom: system extra */
   const monitorsBox = h('div');
+  const MODES = { progman: 'Behind icons (Windows 11 24H2+)', classic: 'Behind icons (WorkerW)', failed: 'Failed – see log' };
   function renderMonitors() {
     monitorsBox.innerHTML = '';
+    const mode = status.attach && status.attach.mode;
+    if (mode) monitorsBox.append(h('div', { class: 'row-hint', style: 'margin:4px 0 6px' }, 'Desktop mode: ' + (MODES[mode] || mode)));
     for (const d of status.displays || []) {
       monitorsBox.append(h('div', { class: 'monitor' }, icon('monitor'),
         h('div', {}, h('b', {}, `${d.width} × ${d.height}`), ` · ${Math.round(d.scaleFactor * 100)}% · ${d.refreshRate} Hz${d.primary ? ' · Primary' : ''}`)));
@@ -319,6 +322,8 @@
       h('div', { class: 'row' },
         h('div', { class: 'row-hint', style: 'margin-bottom:10px' }, 'Export a web wallpaper project (with your image and current settings) that can be imported into Wallpaper Engine.'),
         h('button', { class: 'btn', onclick: async () => { const out = await api.exportWallpaperEngine(); if (out) toast('Exported to ' + out); } }, icon('export'), 'Export project…'))),
+    h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, 'Diagnostics'),
+      h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => api.openLog() }, icon('export'), 'Open log file'))),
     h('div', { class: 'nav-foot', style: 'display:block;padding:4px 2px' }, `Version ${state.version} · ${state.platform}`));
   renderMonitors();
 
@@ -368,7 +373,8 @@
     const el = $('#status');
     el.className = 'status';
     let text;
-    if (status.error) { el.classList.add('error'); text = 'Wallpaper error'; el.title = status.error; }
+    if (status.attach && status.attach.mode === 'failed') { el.classList.add('error'); text = 'Desktop attach failed'; el.title = status.attach.error || ''; }
+    else if (status.error) { el.classList.add('error'); text = 'Wallpaper error'; el.title = status.error; }
     else if (!status.enabled) text = 'Wallpaper off';
     else if (status.suspended) { el.classList.add('suspended'); text = 'Sleeping · ' + ({ fullscreen: 'fullscreen app', battery: 'on battery', locked: 'locked', sleep: 'system sleep' }[status.reason] || 'paused'); }
     else if (paused) { el.classList.add('paused'); text = 'Paused'; }

@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('rainApi', {
   onStatus: on('status:changed'),
 
   // Misc
+  openLog: () => ipcRenderer.invoke('log:open'),
   exportWallpaperEngine: () => ipcRenderer.invoke('export:we'),
   reportFps: (fps) => ipcRenderer.send('wallpaper:fps', fps),
   reportError: (msg) => ipcRenderer.send('wallpaper:error', String(msg)),

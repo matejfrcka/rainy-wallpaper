@@ -34,6 +34,7 @@ function load() {
       SendMessageTimeoutW: user32.func('intptr_t __stdcall SendMessageTimeoutW(intptr_t hwnd, uint32 msg, uintptr_t wParam, intptr_t lParam, uint32 flags, uint32 timeout, void *result)'),
       EnumWindows: user32.func('bool __stdcall EnumWindows(EnumWindowsProc *cb, intptr_t lParam)'),
       SetParent: user32.func('intptr_t __stdcall SetParent(intptr_t child, intptr_t parent)'),
+      GetParent: user32.func('intptr_t __stdcall GetParent(intptr_t hwnd)'),
       SetWindowPos: user32.func('bool __stdcall SetWindowPos(intptr_t hwnd, intptr_t after, int x, int y, int cx, int cy, uint32 flags)'),
       GetWindowLongPtrW: user32.func('intptr_t __stdcall GetWindowLongPtrW(intptr_t hwnd, int index)'),
       SetWindowLongPtrW: user32.func('intptr_t __stdcall SetWindowLongPtrW(intptr_t hwnd, int index, intptr_t value)'),
@@ -71,7 +72,15 @@ function className(a, hwnd) {
   return n > 0 ? String.fromCharCode(...buf.subarray(0, n)) : '';
 }
 
-/** Locate the window that hosts the wallpaper layer. */
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const hex = (h) => (h ? '0x' + Number(h).toString(16) : '0');
+
+/**
+ * Locate the window that hosts the wallpaper layer.
+ *  - Windows 11 24H2+:  Progman > [SHELLDLL_DefView (icons), WorkerW (wallpaper)]
+ *  - Older Windows:     WorkerW(icons, contains SHELLDLL_DefView) followed by a
+ *                       separate top-level WorkerW behind it (wallpaper layer).
+ */
 function findWallpaperHost(a) {
   const progman = a.FindWindowW('Progman', null);
   if (!progman) return null;
@@ -79,56 +88,77 @@ function findWallpaperHost(a) {
   a.SendMessageTimeoutW(progman, 0x052c, 0xd, 0x1, 0, 1000, null);
   a.SendMessageTimeoutW(progman, 0x052c, 0, 0, 0, 1000, null);
 
-  let workerw = 0;
+  const defViewInProgman = a.FindWindowExW(progman, 0, 'SHELLDLL_DefView', null);
+  const childWorker = a.FindWindowExW(progman, 0, 'WorkerW', null);
+  if (defViewInProgman && childWorker) {
+    return { mode: 'progman', progman, defView: defViewInProgman, workerw: childWorker };
+  }
+
+  let iconHost = 0;
   a.EnumWindows((hwnd) => {
-    if (a.FindWindowExW(hwnd, 0, 'SHELLDLL_DefView', null)) {
-      const w = a.FindWindowExW(0, hwnd, 'WorkerW', null);
-      if (w) workerw = w;
-    }
+    if (a.FindWindowExW(hwnd, 0, 'SHELLDLL_DefView', null)) { iconHost = hwnd; return false; }
     return true;
   }, 0);
-  if (workerw) return { mode: 'classic', parent: workerw };
-
-  // Windows 11 24H2+: Progman hosts SHELLDLL_DefView and a child WorkerW.
-  const childWorker = a.FindWindowExW(progman, 0, 'WorkerW', null);
-  const defView = a.FindWindowExW(progman, 0, 'SHELLDLL_DefView', null);
-  if (defView) return { mode: 'progman', parent: progman, workerw: childWorker, defView };
-  return null;
+  if (iconHost) {
+    const w = a.FindWindowExW(0, iconHost, 'WorkerW', null);
+    if (w && w !== iconHost) return { mode: 'classic', parent: w, iconHost };
+  }
+  return null; // WorkerW not created yet → caller retries
 }
 
 /**
- * Attach a BrowserWindow to the desktop.
+ * Attach a BrowserWindow behind the desktop icons.
  * @param {Buffer} handle  win.getNativeWindowHandle()
  * @param {{x,y,width,height}} rect  physical-pixel rect of the target monitor
  * @param {{x,y}} origin  physical top-left of the virtual screen
+ * @param {(msg:string)=>void} log
+ * @returns {Promise<object|null>} host description, or null on failure
  */
-function attachToDesktop(handle, rect, origin) {
+async function attachToDesktop(handle, rect, origin, log = () => {}) {
   const a = load();
-  if (!a) return false;
+  if (!a) { log('attach: koffi/user32 not available'); return null; }
+  const hwnd = hwndFromBuffer(handle);
+  let host = null;
+  for (let i = 0; i < 25 && !host; i++) {
+    try { host = findWallpaperHost(a); } catch (e) { log('attach: find error ' + e.message); }
+    if (!host) await sleep(200);
+  }
+  if (!host) { log('attach: wallpaper WorkerW not found'); return null; }
   try {
-    const hwnd = hwndFromBuffer(handle);
-    const host = findWallpaperHost(a);
-    if (!host) return false;
+    const parent = host.mode === 'progman' ? host.progman : host.parent;
+    log(`attach: mode=${host.mode} hwnd=${hex(hwnd)} parent=${hex(parent)} defView=${hex(host.defView || host.iconHost)} workerw=${hex(host.workerw)}`);
     const ex = Number(a.GetWindowLongPtrW(hwnd, GWL_EXSTYLE));
     let newEx = ex | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW;
     if (host.mode === 'progman') newEx |= WS_EX_LAYERED;
     a.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, newEx);
     if (host.mode === 'progman') a.SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
+    a.SetParent(hwnd, parent);
+    const actual = Number(a.GetParent(hwnd));
+    if (actual !== Number(parent)) { log(`attach: SetParent failed (parent=${hex(actual)})`); return null; }
+    host.hwnd = hwnd;
+    host.rect = { x: rect.x - origin.x, y: rect.y - origin.y, width: rect.width, height: rect.height };
+    restack(host);
+    return host;
+  } catch (e) {
+    log('attach: error ' + e.message);
+    return null;
+  }
+}
 
-    a.SetParent(hwnd, host.parent);
-    const x = rect.x - origin.x, y = rect.y - origin.y;
+/** (Re)apply position and z-order: our window must stay below the icon layer. */
+function restack(host) {
+  const a = load();
+  if (!a || !host) return;
+  try {
+    const { hwnd, rect } = host;
     if (host.mode === 'progman') {
-      // Directly below the icon layer, above the system wallpaper WorkerW.
-      a.SetWindowPos(hwnd, host.defView, x, y, rect.width, rect.height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
+      // hWndInsertAfter = DefView → placed directly *below* the icons.
+      a.SetWindowPos(hwnd, host.defView, rect.x, rect.y, rect.width, rect.height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
       if (host.workerw) a.SetWindowPos(host.workerw, hwnd, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     } else {
-      a.SetWindowPos(hwnd, 0, x, y, rect.width, rect.height, SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+      a.SetWindowPos(hwnd, 0, rect.x, rect.y, rect.width, rect.height, SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
     }
-    return true;
-  } catch (e) {
-    console.warn('[win32] attach failed:', e.message);
-    return false;
-  }
+  } catch { /* ignore */ }
 }
 
 /** Fallback when attaching fails: keep the window at the bottom of the z-order. */
@@ -194,4 +224,4 @@ function handleToNumber(handle) {
   try { return hwndFromBuffer(handle); } catch { return 0; }
 }
 
-module.exports = { attachToDesktop, sendToBottom, getFullscreenState, refreshDesktop, handleToNumber, isAvailable: () => !!load() };
+module.exports = { attachToDesktop, restack, sendToBottom, getFullscreenState, refreshDesktop, handleToNumber, isAvailable: () => !!load() };
