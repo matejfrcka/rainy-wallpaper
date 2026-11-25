@@ -1,0 +1,231 @@
+/**
+ * GLSL ES 3.0 shaders for the glass renderer.
+ * Coordinate convention: `vUv` is GL screen space (0,0 bottom-left).
+ * DOM sources (image, canvases) are uploaded unflipped, so they are sampled
+ * with a flipped v.
+ */
+(function (root) {
+  'use strict';
+
+  const VERT = `#version 300 es
+  in vec2 aPos;
+  out vec2 vUv;
+  void main() {
+    vUv = aPos * 0.5 + 0.5;
+    gl_Position = vec4(aPos, 0.0, 1.0);
+  }`;
+
+  /** Background composition: fit / fill / stretch, focal point, zoom, brightness. */
+  const COMPOSE = `#version 300 es
+  precision highp float;
+  in vec2 vUv;
+  out vec4 outColor;
+  uniform sampler2D uImage;
+  uniform vec2 uCanvasSize;
+  uniform vec2 uImageSize;
+  uniform int uFitMode;        // 0 fill, 1 fit, 2 stretch
+  uniform vec2 uPos;           // focal point 0..1 (y: 0 = top)
+  uniform float uZoom;
+  uniform float uBrightness;
+  void main() {
+    float ac = uCanvasSize.x / uCanvasSize.y;
+    float ai = uImageSize.x / uImageSize.y;
+    vec2 sz;
+    if (uFitMode == 0) sz = ai > ac ? vec2(ai / ac, 1.0) : vec2(1.0, ac / ai);
+    else if (uFitMode == 1) sz = ai > ac ? vec2(1.0, ac / ai) : vec2(ai / ac, 1.0);
+    else sz = vec2(1.0);
+    sz *= uZoom;
+    vec2 pos = vec2(uPos.x, 1.0 - uPos.y);
+    vec2 origin = (1.0 - sz) * pos;
+    vec2 iuv = (vUv - origin) / sz;
+    vec2 tuv = vec2(iuv.x, 1.0 - iuv.y);
+    vec3 col;
+    if (any(lessThan(iuv, vec2(0.0))) || any(greaterThan(iuv, vec2(1.0)))) {
+      // Letterbox area for "Fit": a dark, very blurred ambient version of the image.
+      vec2 amb = vec2(vUv.x, 1.0 - vUv.y);
+      col = textureLod(uImage, amb, 7.0).rgb * 0.35;
+    } else {
+      col = texture(uImage, tuv).rgb;
+    }
+    outColor = vec4(col * uBrightness, 1.0);
+  }`;
+
+  /** Separable Gaussian (9 taps via 5 linear fetches). */
+  const BLUR = `#version 300 es
+  precision highp float;
+  in vec2 vUv;
+  out vec4 outColor;
+  uniform sampler2D uTex;
+  uniform vec2 uDir;           // (spread / width, 0) or (0, spread / height)
+  void main() {
+    vec3 c = texture(uTex, vUv).rgb * 0.2270270270;
+    c += texture(uTex, vUv + uDir * 1.3846153846).rgb * 0.3162162162;
+    c += texture(uTex, vUv - uDir * 1.3846153846).rgb * 0.3162162162;
+    c += texture(uTex, vUv + uDir * 3.2307692308).rgb * 0.0702702703;
+    c += texture(uTex, vUv - uDir * 3.2307692308).rgb * 0.0702702703;
+    outColor = vec4(c, 1.0);
+  }`;
+
+  /** Final composite: glass, condensation, refracting drops, streaks, light. */
+  const GLASS = `#version 300 es
+  precision highp float;
+  in vec2 vUv;
+  out vec4 outColor;
+
+  uniform sampler2D uScene;    // background (sharp, after user blur)
+  uniform sampler2D uBlur;     // heavily blurred background
+  uniform sampler2D uWater;    // water normal map (DOM orientation)
+  uniform sampler2D uFog;      // condensation clear mask (DOM orientation)
+  uniform vec2 uRes;
+  uniform float uTime;
+  uniform float uRefraction;
+  uniform float uDistortion;
+  uniform float uChromatic;
+  uniform float uTransparency;
+  uniform float uReflection;
+  uniform float uCondensation;
+  uniform float uBlurAmt;
+  uniform float uStreaks;
+  uniform float uRainAmt;
+  uniform float uFlash;
+  uniform float uDayNight;     // -1 night .. 0 neutral .. 1 day
+
+  float hash(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+  }
+  float noise(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + vec2(1, 0)), f.x),
+               mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), f.x), f.y);
+  }
+  float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+
+  // Rain falling outside, behind the glass (out of focus streaks).
+  float streakLayer(vec2 uv, float scale, float speed, float density, float seed) {
+    float aspect = uRes.x / uRes.y;
+    vec2 p = vec2(uv.x * aspect, uv.y);
+    p.x += p.y * 0.06;                    // slight wind slant
+    p *= vec2(scale, scale * 0.18);
+    p.y += uTime * speed;
+    vec2 id = floor(p);
+    vec2 f = fract(p);
+    float h = hash(id + seed);
+    if (h > density) return 0.0;
+    float x = 0.2 + 0.6 * hash(id * 1.7 + seed);
+    float w = 0.035;
+    float line = smoothstep(w, 0.0, abs(f.x - x));
+    float len = 0.35 + 0.5 * hash(id * 3.1 + seed);
+    float start = hash(id * 5.3 + seed) * (1.0 - len);
+    float seg = smoothstep(start, start + 0.1, f.y) * smoothstep(start + len, start + len - 0.15, f.y);
+    return line * seg * (0.5 + 0.5 * h / density);
+  }
+
+  void main() {
+    vec2 uv = vUv;
+    vec2 duv = vec2(uv.x, 1.0 - uv.y);
+    vec2 aspect = vec2(uRes.y / uRes.x, 1.0);
+
+    // ---- glass surface imperfections --------------------------------------
+    vec2 wave = vec2(noise(uv * vec2(4.0, 9.0) + 3.1), noise(uv * vec2(5.0, 8.0) - 7.3)) - 0.5;
+    wave += 0.5 * (vec2(noise(uv * 23.0 + 1.0), noise(uv * 21.0 - 4.0)) - 0.5);
+    vec2 guv = uv + wave * uDistortion * 0.006;
+
+    // ---- water map ---------------------------------------------------------
+    vec4 w = texture(uWater, duv);
+    float cov = smoothstep(0.30, 0.42, w.a);
+    vec2 n = vec2(w.r * 2.0 - 1.0, -(w.g * 2.0 - 1.0));
+    float nl = clamp(length(n), 0.0, 1.0);
+    float thick = w.b;
+
+    // ---- glass (no drop) ---------------------------------------------------
+    float cleared = texture(uFog, duv).r;
+    float fog = uCondensation * (1.0 - cleared);
+    vec3 gSharp = texture(uScene, guv).rgb;
+    vec3 gBlur = texture(uBlur, guv).rgb;
+    vec3 glass = mix(gSharp, gBlur, clamp(fog * 1.4, 0.0, 1.0));
+    // Condensation is milky: lifts shadows and scatters light.
+    vec3 fogTint = gBlur * 0.75 + vec3(0.10, 0.115, 0.13) + luma(gBlur) * 0.15;
+    glass = mix(glass, fogTint, fog * 0.55);
+    // Glass transparency: less transparent = more diffuse + grey tinted.
+    float opacity = 1.0 - uTransparency;
+    glass = mix(glass, gBlur * 0.8 + vec3(0.06, 0.07, 0.08), opacity * 0.7);
+
+    // Rain streaks outside the window.
+    if (uStreaks > 0.0) {
+      float s = streakLayer(uv, 38.0, 2.6, 0.10 + uRainAmt * 0.25, 1.0) * 0.6
+              + streakLayer(uv, 70.0, 3.4, 0.08 + uRainAmt * 0.2, 7.0) * 0.4
+              + streakLayer(uv, 120.0, 4.4, 0.06 + uRainAmt * 0.18, 13.0) * 0.25;
+      glass += s * uStreaks * (0.06 + luma(gBlur) * 0.35) * (1.0 - fog * 0.6);
+    }
+
+    // ---- drops: convex lenses ---------------------------------------------
+    vec3 drop = glass;
+    if (cov > 0.001) {
+      // Refraction: a water lens shows a magnified, inverted image of what
+      // lies behind it → sample against the normal, more for thicker drops.
+      vec2 off = -n * (0.015 + 0.11 * uRefraction) * (0.35 + thick * 0.9) * aspect;
+      off += wave * uDistortion * 0.01;
+      float ca = uChromatic * 0.18;
+      vec2 base = uv + off;
+      vec3 sharp = vec3(
+        texture(uScene, uv + off * (1.0 + ca)).r,
+        texture(uScene, base).g,
+        texture(uScene, uv + off * (1.0 - ca)).b);
+      vec3 blurred = texture(uBlur, base).rgb;
+      // Larger (thicker) drops defocus the background more.
+      float db = uBlurAmt * smoothstep(0.35, 1.0, thick) * 0.85;
+      drop = mix(sharp, blurred, db);
+      // Lens focusing: brighter centre, light loss at the rim.
+      drop *= 0.92 + 0.18 * thick;
+      float rim = smoothstep(0.55, 1.0, nl);
+      drop = mix(drop, drop * 0.28 + gBlur * 0.05, rim * 0.75);
+      // Depth: drops are slightly darker and more contrasted than the glass.
+      drop = mix(drop, drop * drop * 1.25, 0.15);
+
+      // Specular highlight (light from upper-left) + bottom caustic crescent.
+      vec3 N = normalize(vec3(n * 1.8, 1.0));
+      vec3 L = normalize(vec3(-0.45, 0.65, 1.0));
+      vec3 R = reflect(-L, N);
+      float spec = pow(max(R.z, 0.0), 60.0);
+      float spec2 = pow(max(dot(N, normalize(vec3(-0.3, 0.5, 1.0))), 0.0), 220.0);
+      float caustic = smoothstep(0.35, 0.8, nl) * smoothstep(0.0, -0.8, n.y) * smoothstep(1.0, 0.85, nl);
+      vec3 env = gBlur + 0.15;
+      drop += (spec * 0.55 + spec2 * 0.9) * uReflection * (0.6 + env * 0.6);
+      drop += caustic * uReflection * 0.35 * env;
+    }
+
+    vec3 col = mix(glass, drop, cov);
+
+    // ---- glass reflections -----------------------------------------------
+    float sheen = smoothstep(0.0, 1.0, 1.0 - uv.y) * 0.03
+                + smoothstep(0.08, 0.0, abs(fract((uv.x * 0.6 + uv.y) * 0.9 - 0.2) - 0.5) - 0.32) * 0.025;
+    col += sheen * uReflection * (0.5 + luma(gBlur));
+
+    // ---- lightning ----------------------------------------------------------
+    col += uFlash * (col * 0.9 + vec3(0.16, 0.17, 0.2) + gBlur * 0.4 + cov * 0.25);
+
+    // ---- day / night grading -----------------------------------------------
+    if (uDayNight < 0.0) {
+      float t = -uDayNight;
+      col *= mix(1.0, 0.55, t);
+      col = mix(col, col * vec3(0.72, 0.86, 1.25), t * 0.85);
+    } else {
+      float t = uDayNight;
+      col *= vec3(1.0 + 0.12 * t, 1.0 + 0.05 * t, 1.0 - 0.06 * t);
+    }
+
+    // Subtle vignette for depth.
+    vec2 vc = uv - 0.5;
+    col *= 1.0 - dot(vc, vc) * 0.25;
+
+    // Tiny dither to avoid banding in dark skies.
+    col += (hash(uv * uRes + fract(uTime)) - 0.5) / 255.0;
+    outColor = vec4(col, 1.0);
+  }`;
+
+  root.RainGlass = root.RainGlass || {};
+  root.RainGlass.Shaders = { VERT, COMPOSE, BLUR, GLASS };
+})(typeof self !== 'undefined' ? self : this);

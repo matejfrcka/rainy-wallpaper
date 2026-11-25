@@ -1,0 +1,50 @@
+{
+  "name": "rainy-glass-wallpaper",
+  "productName": "Rainy Glass Wallpaper Engine",
+  "version": "1.0.0",
+  "description": "Live desktop wallpaper: realistic animated rain on glass over any image you choose.",
+  "main": "src/main/main.js",
+  "author": "Rainy Glass",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --enable-logging",
+    "build": "electron-builder --win nsis portable --x64",
+    "build:dir": "electron-builder --win dir --x64",
+    "build:we": "node scripts/build-wallpaper-engine.js",
+    "test": "node scripts/test-engine.js"
+  },
+  "dependencies": {
+    "koffi": "^2.9.0"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.rainyglass.wallpaper",
+    "productName": "Rainy Glass Wallpaper Engine",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "wallpaper-engine/**/*",
+      "package.json"
+    ],
+    "asarUnpack": ["node_modules/koffi/**"],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [{ "target": "nsis", "arch": ["x64"] }, { "target": "portable", "arch": ["x64"] }]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Rainy Glass"
+    },
+    "portable": { "artifactName": "RainyGlass-${version}-portable.exe" }
+  }
+}
