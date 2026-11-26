@@ -13,7 +13,13 @@ class SettingsStore {
     this.settingsFile = path.join(dir, 'settings.json');
     this.presetsFile = path.join(dir, 'presets.json');
     fs.mkdirSync(dir, { recursive: true });
-    this.settings = sanitize(this.readJson(this.settingsFile, {}));
+    const raw = this.readJson(this.settingsFile, {});
+    // v2: default droplet size changed 50 → 20; move users still on the old default.
+    if (raw && typeof raw === 'object' && !(raw.settingsVersion >= 2)) {
+      if (raw.dropletSize === 50) raw.dropletSize = 20;
+      raw.settingsVersion = 2;
+    }
+    this.settings = sanitize(raw);
     const presets = this.readJson(this.presetsFile, []);
     this.userPresets = Array.isArray(presets) ? presets.filter((p) => p && typeof p.name === 'string' && p.values) : [];
     this.saveTimer = null;

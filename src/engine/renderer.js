@@ -471,7 +471,9 @@
       gl.uniform1f(u.uReflection, f('reflection', 45));
       gl.uniform1f(u.uCondensation, s.condensationEnabled === false ? 0 : f('condensation', 35));
       gl.uniform1f(u.uBlurAmt, f('blur', 50));
-      gl.uniform1f(u.uStreaks, s.streaksEnabled === false ? 0 : f('streaks', 35) * (0.3 + 0.7 * f('rainIntensity', 55)));
+      gl.uniform1f(u.uStreaks, s.precipitation === 'snow'
+        ? f('snowFall', 60)
+        : (s.streaksEnabled === false ? 0 : f('streaks', 35) * (0.3 + 0.7 * f('rainIntensity', 55))));
       gl.uniform1f(u.uRainAmt, f('rainIntensity', 55));
       gl.uniform1f(u.uFlash, flash || 0);
       gl.uniform1f(u.uDayNight, (f('dayNight', 50) - 0.5) * 2);

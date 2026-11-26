@@ -24,13 +24,17 @@
     // Rain
     rainIntensity: 55,         // 0..100
     dropletDensity: 60,
-    dropletSize: 50,
+    dropletSize: 20,
     dropletSpeed: 50,
     trailLength: 50,
     merging: true,
     randomGeneration: true,
     precipitation: 'rain',     // 'rain' | 'snow'
     frost: 0,                  // ice crystals on the glass (0 = off)
+    snowIntensity: 50,         // snow mode: how much snow sticks to the glass
+    flakeSize: 40,             // snow mode: size of the flakes on the glass
+    snowMelt: 30,              // snow mode: how fast stuck snow melts
+    snowFall: 60,              // snow mode: snow falling outside the window (0 = off)
 
     // Glass
     refraction: 60,
@@ -71,6 +75,7 @@
     pauseOnBattery: false,
     startWithWindows: false,
     wallpaperEnabled: true,
+    settingsVersion: 2,        // bumped when defaults change (one-time migrations)
     screensaverEnabled: false, // rain screensaver after inactivity
     screensaverMinutes: 10,
     screensaverClock: true,
@@ -91,6 +96,7 @@
     streaks: [0, 100], volume: [0, 100], dayNight: [0, 100], fpsLimit: [0, 240], renderScale: [50, 100],
     windVolume: [0, 100], weatherLat: [-90, 90], weatherLon: [-180, 180],
     frost: [0, 100], parallax: [0, 100], screensaverMinutes: [1, 120],
+    snowIntensity: [0, 100], flakeSize: [0, 100], snowMelt: [0, 100], snowFall: [0, 100], settingsVersion: [0, 1000],
   };
 
   const ENUMS = { fitMode: ['fill', 'fit', 'stretch'], soundscape: ['window', 'roof', 'leaves', 'car'], precipitation: ['rain', 'snow'], language: ['auto', 'en', 'sk'] };
@@ -111,17 +117,18 @@
     'randomGeneration', 'refraction', 'distortion', 'chromatic', 'glassTransparency', 'reflection',
     'condensationEnabled', 'condensation', 'blur', 'streaksEnabled', 'streaks', 'soundEnabled', 'volume',
     'thunderEnabled', 'lightning', 'dayNight', 'bgBrightness', 'bgBlur', 'soundscape', 'windEnabled', 'windVolume', 'precipitation', 'frost',
+    'snowIntensity', 'flakeSize', 'snowMelt', 'snowFall',
   ];
 
   const BUILTIN_PRESETS = [
-    { name: 'Gentle Drizzle', builtin: true, values: { rainIntensity: 25, dropletDensity: 70, dropletSize: 35, dropletSpeed: 35, trailLength: 35, condensation: 20, streaks: 15, thunderEnabled: false, dayNight: 55 } },
-    { name: 'Steady Rain', builtin: true, values: { rainIntensity: 55, dropletDensity: 60, dropletSize: 50, dropletSpeed: 50, trailLength: 50, condensation: 35, streaks: 35, thunderEnabled: false, dayNight: 50 } },
-    { name: 'Thunderstorm', builtin: true, values: { rainIntensity: 95, dropletDensity: 80, dropletSize: 70, dropletSpeed: 80, trailLength: 75, condensation: 30, streaks: 80, thunderEnabled: true, lightning: true, soundEnabled: true, dayNight: 30, bgBrightness: 85 } },
-    { name: 'Foggy Morning', builtin: true, values: { rainIntensity: 20, dropletDensity: 85, dropletSize: 40, dropletSpeed: 30, trailLength: 60, condensationEnabled: true, condensation: 80, glassTransparency: 70, streaks: 5, dayNight: 62 } },
-    { name: 'After the Storm', builtin: true, values: { rainIntensity: 3, dropletDensity: 90, dropletSize: 60, dropletSpeed: 35, trailLength: 70, randomGeneration: true, condensation: 45, streaks: 0, thunderEnabled: false, dayNight: 58, bgBrightness: 105 } },
-    { name: 'Snowy Window', builtin: true, values: { precipitation: 'snow', rainIntensity: 45, dropletDensity: 40, dropletSize: 45, dropletSpeed: 25, trailLength: 40, condensation: 40, frost: 25, streaks: 60, dayNight: 45, windEnabled: true } },
-    { name: 'Frosty Morning', builtin: true, values: { precipitation: 'snow', rainIntensity: 10, dropletDensity: 30, dropletSize: 35, dropletSpeed: 20, condensation: 55, frost: 75, streaks: 15, dayNight: 62 } },
-    { name: 'Night Window', builtin: true, values: { rainIntensity: 60, dropletDensity: 65, dropletSize: 55, dropletSpeed: 50, trailLength: 55, condensation: 40, reflection: 65, streaks: 40, dayNight: 12, bgBrightness: 80 } },
+    { name: 'Gentle Drizzle', builtin: true, values: { rainIntensity: 25, dropletDensity: 70, dropletSize: 15, dropletSpeed: 35, trailLength: 35, condensation: 20, streaks: 15, thunderEnabled: false, dayNight: 55 } },
+    { name: 'Steady Rain', builtin: true, values: { rainIntensity: 55, dropletDensity: 60, dropletSize: 20, dropletSpeed: 50, trailLength: 50, condensation: 35, streaks: 35, thunderEnabled: false, dayNight: 50 } },
+    { name: 'Thunderstorm', builtin: true, values: { rainIntensity: 95, dropletDensity: 80, dropletSize: 35, dropletSpeed: 80, trailLength: 75, condensation: 30, streaks: 80, thunderEnabled: true, lightning: true, soundEnabled: true, dayNight: 30, bgBrightness: 85 } },
+    { name: 'Foggy Morning', builtin: true, values: { rainIntensity: 20, dropletDensity: 85, dropletSize: 20, dropletSpeed: 30, trailLength: 60, condensationEnabled: true, condensation: 80, glassTransparency: 70, streaks: 5, dayNight: 62 } },
+    { name: 'After the Storm', builtin: true, values: { rainIntensity: 3, dropletDensity: 90, dropletSize: 30, dropletSpeed: 35, trailLength: 70, randomGeneration: true, condensation: 45, streaks: 0, thunderEnabled: false, dayNight: 58, bgBrightness: 105 } },
+    { name: 'Snowy Window', builtin: true, values: { precipitation: 'snow', snowIntensity: 65, flakeSize: 45, snowMelt: 20, snowFall: 70, rainIntensity: 45, dropletDensity: 40, dropletSize: 20, dropletSpeed: 25, trailLength: 40, condensation: 40, frost: 25, streaks: 60, dayNight: 45, windEnabled: true } },
+    { name: 'Frosty Morning', builtin: true, values: { precipitation: 'snow', snowIntensity: 25, flakeSize: 30, snowMelt: 10, snowFall: 20, rainIntensity: 10, dropletDensity: 30, dropletSize: 15, dropletSpeed: 20, condensation: 55, frost: 75, streaks: 15, dayNight: 62 } },
+    { name: 'Night Window', builtin: true, values: { rainIntensity: 60, dropletDensity: 65, dropletSize: 25, dropletSpeed: 50, trailLength: 55, condensation: 40, reflection: 65, streaks: 40, dayNight: 12, bgBrightness: 80 } },
   ];
 
   function clampNumber(v, [min, max], fallback) {

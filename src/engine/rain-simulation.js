@@ -106,6 +106,9 @@
       p.randomGen = s.randomGeneration !== undefined ? !!s.randomGeneration : true;
       p.condensation = (s.condensationEnabled === false) ? 0 : v('condensation', 35);
       p.snow = s.precipitation === 'snow';
+      p.snowIntensity = v('snowIntensity', 50);
+      p.flakeSize = v('flakeSize', 40);
+      p.snowMelt = v('snowMelt', 30);
       this.updateDerived();
     }
 
@@ -128,7 +131,7 @@
       const tiny = Math.round(this.width * this.height / 900 * (0.2 + this.params.density));
       for (let i = 0; i < tiny; i++) this.spawnTiny();
       if (this.params.snow) {
-        const flakes = Math.round(this.width * this.height / 2500 * (0.3 + this.params.intensity));
+        const flakes = Math.round(this.width * this.height / 2500 * (0.3 + this.params.snowIntensity));
         for (let i = 0; i < flakes; i++) this.spawnFlake();
       }
     }
@@ -177,7 +180,7 @@
     spawnFlake() {
       const u = this.unit;
       const clump = chance(0.08) ? rand(2, 3.5) : 1;
-      const r = rand(0.8, 3.2) * u * (0.6 + this.params.size * 0.8) * clump;
+      const r = rand(0.8, 3.2) * u * (0.35 + this.params.flakeSize * 1.5) * clump;
       if (this.cmd.snow.length < 4 * 20000) this.cmd.snow.push(rand(0, this.width), rand(0, this.height), r, rand(0.55, 1));
     }
 
@@ -220,16 +223,16 @@
         const rate = (0.15 + p.intensity * p.intensity * 4.5) * ts * area * (p.snow ? 0.12 : 1);
         let n = Math.floor(rate) + (chance(rate % 1) ? 1 : 0);
         while (n-- > 0 && drops.length < p.maxDrops) this.spawnDrop(false);
-        if (p.snow) {
-          const fr = (0.4 + p.intensity * 5) * ts * area;
-          let f = Math.floor(fr) + (chance(fr % 1) ? 1 : 0);
-          while (f-- > 0) this.spawnFlake();
-        }
+      }
+      if (p.snow && p.randomGen && p.snowIntensity > 0) {
+        const fr = p.snowIntensity * p.snowIntensity * 6 * ts * (this.width * this.height) / (960 * 540);
+        let f = Math.floor(fr) + (chance(fr % 1) ? 1 : 0);
+        while (f-- > 0) this.spawnFlake();
       }
       // Snow slowly melts away.
       if ((this.snowFrame += ts) > 30) {
         this.snowFrame = 0;
-        this.cmd.snowFade = Math.min(1, this.cmd.snowFade + (p.snow ? 0.012 : 0.08));
+        this.cmd.snowFade = Math.min(1, this.cmd.snowFade + (p.snow ? 0.003 + p.snowMelt * 0.03 : 0.08));
       }
       if (p.density > 0) {
         const rate = p.density * p.density * 30 * ts * (this.width * this.height) / (960 * 540);
