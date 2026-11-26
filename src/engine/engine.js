@@ -336,7 +336,10 @@
           this.nextLightning -= dt;
           if (this.nextLightning <= 0) {
             const i = (this.settings.rainIntensity ?? 50) / 100;
-            this.nextLightning = (12 + Math.random() * 40) * (1.4 - i);
+            // Mean interval: ~2 min (frequency 0) … ~6 s (frequency 100), stormier rain strikes more often.
+            const f = (this.settings.thunderFrequency ?? 40) / 100;
+            const mean = (120 - f * 114) * (1.3 - i * 0.5);
+            this.nextLightning = mean * (0.4 + Math.random() * 1.2);
             const distance = Math.random();
             this.lightning(distance, true);
             if (this.onLightning) this.onLightning(distance);

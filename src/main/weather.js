@@ -39,26 +39,37 @@ async function current(lat, lon) {
   };
 }
 
-/** Map current weather to effect settings. */
+/**
+ * Map current weather to effect settings so the desktop follows the forecast:
+ * dry glass when it doesn't rain, drizzle → light rain → heavy showers by
+ * WMO weather code and measured precipitation, snow by snowfall, thunder,
+ * fog (condensation), wind and frost below −2 °C.
+ */
 function toSettings(w) {
-  const code = w.code;
+  const code = w.code, mm = w.precip || 0;
+  const RAIN = { 51: 15, 53: 22, 55: 30, 56: 20, 57: 30, 61: 35, 63: 60, 65: 85, 66: 40, 67: 70, 80: 45, 81: 70, 82: 95, 95: 80, 96: 90, 99: 95 };
+  const SNOW = { 71: 35, 73: 60, 75: 90, 77: 30, 85: 55, 86: 85 };
   const thunder = code >= 95;
-  const drizzle = code >= 51 && code <= 57;
   const fog = code === 45 || code === 48;
-  let intensity;
-  if (w.precip > 0) intensity = Math.min(100, 22 + w.precip * 16);
-  else if (thunder || (code >= 61 && code <= 82)) intensity = 30;
-  else if (drizzle) intensity = 18;
-  else intensity = w.cloud > 80 ? 8 : 4; // just a wet window
-  const snow = (code >= 71 && code <= 77) || code === 85 || code === 86;
+  const freezing = [56, 57, 66, 67].includes(code);
   const out = {
-    rainIntensity: Math.round(intensity), thunderEnabled: thunder, windEnabled: w.wind > 25,
-    precipitation: snow ? 'snow' : 'rain',
-    ...(snow ? { snowIntensity: Math.min(100, Math.round(30 + w.precip * 25)), rainIntensity: 15 } : {}),
-    frost: w.temp <= -2 ? Math.min(80, Math.round(-w.temp * 8)) : 0,
+    thunderEnabled: thunder,
+    thunderFrequency: code >= 96 ? 85 : 60,
+    windEnabled: w.wind > 20,
+    windVolume: Math.round(Math.min(90, 25 + w.wind)),
+    frost: w.temp <= -2 ? Math.min(80, Math.round(-w.temp * 8)) : freezing ? 45 : 0,
   };
-  if (fog) Object.assign(out, { condensationEnabled: true, condensation: 75 });
-  if (thunder) out.streaks = Math.max(60, out.streaks || 0);
+  if (SNOW[code] !== undefined) {
+    const amount = Math.min(100, Math.max(SNOW[code], Math.round(25 + mm * 25)));
+    Object.assign(out, { precipitation: 'snow', snowIntensity: amount, snowFall: amount, rainIntensity: 8, dropletDensity: 25 });
+  } else if (RAIN[code] !== undefined || mm > 0) {
+    const amount = Math.min(100, Math.max(RAIN[code] || 0, Math.round(20 + mm * 15)));
+    Object.assign(out, { precipitation: 'rain', rainIntensity: amount, streaks: Math.round(20 + amount * 0.6), dropletDensity: Math.round(45 + amount * 0.35) });
+  } else {
+    // No precipitation: the glass slowly dries; only a little condensation stays.
+    Object.assign(out, { precipitation: 'rain', rainIntensity: 0, streaks: 0, dropletDensity: w.cloud > 80 ? 20 : 8 });
+  }
+  if (fog) Object.assign(out, { condensationEnabled: true, condensation: 75, dropletDensity: 40 });
   return out;
 }
 

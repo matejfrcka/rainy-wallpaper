@@ -15,7 +15,7 @@
 
   // Clock
   const clock = document.getElementById('clock');
-  const lang = state.lang === 'sk' ? 'sk-SK' : undefined;
+  const lang = { sk: 'sk-SK', cs: 'cs-CZ', de: 'de-DE', es: 'es-ES', it: 'it-IT', hu: 'hu-HU', fr: 'fr-FR' }[state.lang];
   function tick() {
     const d = new Date();
     clock.innerHTML = '';

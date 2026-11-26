@@ -125,6 +125,7 @@
           toggle('windEnabled', t('Wind'), { dependsOn: 'soundEnabled' }),
           slider('windVolume', t('Wind volume'), { dependsOn: 'windEnabled' }),
           toggle('thunderEnabled', t('Thunder'), { hint: t('Occasional distant or close thunder.') }),
+          slider('thunderFrequency', t('Thunder frequency'), { dependsOn: 'thunderEnabled', unit: '', format: (v) => (v < 25 ? t('Rarely') : v < 60 ? t('Sometimes') : v < 85 ? t('Often') : t('Very often')) + ' · ' + Math.round(v) }),
           toggle('lightning', t('Lightning flashes'), { dependsOn: 'thunderEnabled' }),
         ] },
         { title: t('Color'), items: [
@@ -156,7 +157,7 @@
           { type: 'button', label: t('Try screensaver'), onClick: () => api.testScreensaver() },
         ] },
         { title: t('Language'), items: [
-          seg('language', t('Language'), [['auto', t('Automatic')], ['en', 'English'], ['sk', 'Slovenčina']]),
+          { type: 'select', key: 'language', label: t('Language'), options: [['auto', t('Automatic')], ['en', 'English'], ['sk', 'Slovenčina'], ['cs', 'Čeština'], ['de', 'Deutsch'], ['fr', 'Français'], ['es', 'Español'], ['it', 'Italiano'], ['hu', 'Magyar']] },
         ] },
         { title: t('Updates'), items: [
           toggle('autoUpdate', t('Install updates automatically')),
@@ -289,6 +290,11 @@
       update = (v) => { if (document.activeElement !== input) input.value = v || ''; };
       input.addEventListener('change', () => change({ [it.key]: input.value }));
       row.append(input);
+    } else if (it.type === 'select') {
+      const sel = h('select', { class: 'select', style: 'flex:0 0 auto;min-width:150px' }, it.options.map(([v, l]) => h('option', { value: v }, l)));
+      update = (v) => { sel.value = v; };
+      sel.addEventListener('change', () => change({ [it.key]: sel.value }));
+      head.append(sel);
     } else if (it.type === 'button') {
       head.append(h('button', { class: 'btn small', onclick: it.onClick }, it.label));
       labelBox.innerHTML = '';
@@ -493,28 +499,48 @@
       : settings.weatherCity;
   }
   const weatherBox = h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, t('Live weather')),
-    buildControl(toggle('weatherSync', t('Sync rain with real weather'), { hint: t('Updates every 15 minutes. Manual changes are overwritten on the next update.') })),
+    buildControl(toggle('weatherSync', t('Sync rain with real weather'), { hint: t('Updates every 10 minutes: rain, snow, thunder, fog and wind follow the real weather. Manual changes are overwritten on the next update.') })),
     h('div', { class: 'row' }, h('div', { class: 'preset-save' }, cityInput, h('button', { class: 'btn primary', onclick: searchWeather }, t('Set location'))), weatherInfo));
   renderWeather();
 
   /* ---------------------------------------------- custom: sleep timer */
+  let sleepAction = 'sound';
+  try { sleepAction = localStorage.getItem('sleepAction') || 'sound'; } catch { /* ignore */ }
+  const actionSeg = h('div', { class: 'segmented' });
+  for (const [val, label] of [['sound', t('Sound off')], ['shutdown', t('Shut down PC')], ['sleep', t('Sleep PC')]]) {
+    const b = h('button', { onclick: () => {
+      sleepAction = val;
+      try { localStorage.setItem('sleepAction', val); } catch { /* ignore */ }
+      // Re-arm a running timer with the new action (keeps the remaining time).
+      if (status.sleep) api.setSleep(Math.max(1, Math.round((status.sleep.endsAt - Date.now()) / 60000)), val);
+      renderSleep();
+    } }, label);
+    b.__a = val;
+    actionSeg.append(b);
+  }
   const sleepSeg = h('div', { class: 'segmented' });
   const sleepInfo = h('div', { class: 'row-hint', style: 'margin-top:6px' });
-  for (const m of [0, 15, 30, 60, 90]) {
-    const b = h('button', { onclick: () => api.setSleep(m) }, m ? `${m} min` : t('Off'));
+  for (const m of [0, 15, 30, 60, 90, 120]) {
+    const b = h('button', { onclick: () => api.setSleep(m, sleepAction) }, m ? `${m} min` : t('Off'));
     b.__m = m;
     sleepSeg.append(b);
   }
   function renderSleep() {
     const sl = status.sleep;
+    const act = sl ? sl.action : sleepAction;
+    for (const b of actionSeg.children) b.classList.toggle('active', b.__a === act);
     for (const b of sleepSeg.children) b.classList.toggle('active', sl ? b.__m === sl.minutes : b.__m === 0);
     if (sl) {
       const left = Math.max(0, Math.round((sl.endsAt - Date.now()) / 60000));
-      sleepInfo.textContent = `${t('Sound fades out in')} ${left} min`;
-    } else sleepInfo.textContent = t('The rain sound slowly fades out and turns off.');
+      const what = { sound: t('Sound fades out in'), shutdown: t('PC shuts down in'), sleep: t('PC goes to sleep in') }[sl.action] || t('Sound fades out in');
+      sleepInfo.textContent = `${what} ${left} min`;
+    } else {
+      sleepInfo.textContent = { sound: t('The rain sound slowly fades out and turns off.'), shutdown: t('The sound fades out, then the PC shuts down. Windows warns you a minute before so you can still cancel it.'), sleep: t('The sound fades out, then the PC goes to sleep.') }[act];
+    }
   }
   const sleepBox = h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, t('Sleep timer')),
-    h('div', { class: 'row' }, h('div', { class: 'row-head' }, h('div', {}, h('div', { class: 'row-label' }, t('Turn off sound after'))), sleepSeg), sleepInfo));
+    h('div', { class: 'row' }, h('div', { class: 'row-head' }, h('div', {}, h('div', { class: 'row-label' }, t('When the time is up'))), actionSeg)),
+    h('div', { class: 'row' }, h('div', { class: 'row-head' }, h('div', {}, h('div', { class: 'row-label' }, t('After'))), sleepSeg), sleepInfo));
   renderSleep();
   setInterval(renderSleep, 15000);
 

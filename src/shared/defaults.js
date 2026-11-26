@@ -52,6 +52,7 @@
     soundEnabled: false,
     volume: 50,
     thunderEnabled: false,
+    thunderFrequency: 40,      // how often thunder strikes (0 = rarely … 100 = very often)
     lightning: true,
     dayNight: 50,              // 0 = deep night, 50 = neutral, 100 = warm day
     autoDayNight: false,       // follow the sun (location from weather or time zone)
@@ -84,7 +85,7 @@
     pauseApps: '',             // comma separated exe names that pause the wallpaper when in front
     hotkeysEnabled: true,      // Ctrl+Alt+R pause, Ctrl+Alt+W wallpaper on/off
     autoUpdate: true,
-    language: 'auto',          // 'auto' | 'en' | 'sk'
+    language: 'auto',          // 'auto' | 'en' | 'sk' | 'cs' | 'de' | 'es' | 'it' | 'hu' | 'fr'
   });
 
   // Numeric ranges used for clamping / validation and by the UI.
@@ -96,10 +97,10 @@
     streaks: [0, 100], volume: [0, 100], dayNight: [0, 100], fpsLimit: [0, 240], renderScale: [50, 100],
     windVolume: [0, 100], weatherLat: [-90, 90], weatherLon: [-180, 180],
     frost: [0, 100], parallax: [0, 100], screensaverMinutes: [1, 120],
-    snowIntensity: [0, 100], flakeSize: [0, 100], snowMelt: [0, 100], snowFall: [0, 100], settingsVersion: [0, 1000],
+    thunderFrequency: [0, 100], snowIntensity: [0, 100], flakeSize: [0, 100], snowMelt: [0, 100], snowFall: [0, 100], settingsVersion: [0, 1000],
   };
 
-  const ENUMS = { fitMode: ['fill', 'fit', 'stretch'], soundscape: ['window', 'roof', 'leaves', 'car'], precipitation: ['rain', 'snow'], language: ['auto', 'en', 'sk'] };
+  const ENUMS = { fitMode: ['fill', 'fit', 'stretch'], soundscape: ['window', 'roof', 'leaves', 'car'], precipitation: ['rain', 'snow'], language: ['auto', 'en', 'sk', 'cs', 'de', 'es', 'it', 'hu', 'fr'] };
   const STRINGS = { weatherCity: 80, pauseApps: 600 };
 
   function sanitizeSchedule(list) {
@@ -116,7 +117,7 @@
     'rainIntensity', 'dropletDensity', 'dropletSize', 'dropletSpeed', 'trailLength', 'merging',
     'randomGeneration', 'refraction', 'distortion', 'chromatic', 'glassTransparency', 'reflection',
     'condensationEnabled', 'condensation', 'blur', 'streaksEnabled', 'streaks', 'soundEnabled', 'volume',
-    'thunderEnabled', 'lightning', 'dayNight', 'bgBrightness', 'bgBlur', 'soundscape', 'windEnabled', 'windVolume', 'precipitation', 'frost',
+    'thunderEnabled', 'thunderFrequency', 'lightning', 'dayNight', 'bgBrightness', 'bgBlur', 'soundscape', 'windEnabled', 'windVolume', 'precipitation', 'frost',
     'snowIntensity', 'flakeSize', 'snowMelt', 'snowFall',
   ];
 

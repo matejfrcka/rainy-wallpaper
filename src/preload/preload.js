@@ -53,7 +53,7 @@ contextBridge.exposeInMainWorld('rainApi', {
   onPointer: on('wallpaper:pointer'),
   onSleep: on('audio:sleep'),
   getSleep: () => ipcRenderer.invoke('sleep:get'),
-  setSleep: (minutes) => ipcRenderer.invoke('sleep:set', minutes),
+  setSleep: (minutes, action) => ipcRenderer.invoke('sleep:set', minutes, action),
   exitScreensaver: () => ipcRenderer.send('screensaver:exit'),
   testScreensaver: () => ipcRenderer.invoke('screensaver:test'),
   pickScheduleImage: () => ipcRenderer.invoke('schedule:pick-image'),
