@@ -55,7 +55,7 @@ class SettingsStore {
 
   reset() {
     // Keep the chosen image and system options; reset the look.
-    const keep = ['backgroundPath', 'useSystemWallpaper', 'galleryMatchLook', 'startWithWindows', 'wallpaperEnabled', 'pauseOnFullscreen', 'pauseOnBattery', 'pauseWhenCovered', 'mouseInteraction', 'weatherSync', 'weatherCity', 'weatherLat', 'weatherLon', 'autoDayNight', 'hotkeysEnabled', 'autoUpdate', 'language', 'screensaverEnabled', 'screensaverMinutes', 'screensaverClock', 'scheduleEnabled', 'schedule', 'pauseApps', 'parallax', 'pixabayKey'];
+    const keep = ['backgroundPath', 'spanMonitors', 'useSystemWallpaper', 'galleryMatchLook', 'startWithWindows', 'wallpaperEnabled', 'pauseOnFullscreen', 'pauseOnBattery', 'pauseWhenCovered', 'mouseInteraction', 'weatherSync', 'weatherCity', 'weatherLat', 'weatherLon', 'autoDayNight', 'hotkeysEnabled', 'autoUpdate', 'language', 'screensaverEnabled', 'screensaverMinutes', 'screensaverClock', 'scheduleEnabled', 'schedule', 'pauseApps', 'parallax', 'pixabayKey', 'taskbarStyle', 'taskbarLightIcons', 'taskbarSavedTheme', 'onlinePhotoQuality', 'onlineVideoQuality', 'widgetClock', 'widgetMedia', 'widgetPosition', 'rgbEnabled', 'musicReactive', 'musicSensitivity', 'musicGlow', 'musicLightning'];
     const next = { ...DEFAULT_SETTINGS };
     for (const k of keep) next[k] = this.settings[k];
     return this.update(next);

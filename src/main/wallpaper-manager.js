@@ -11,7 +11,8 @@ const win32 = require('./win32');
 const isWin = process.platform === 'win32';
 
 class WallpaperManager {
-  constructor({ preload, log = () => {}, onStatus = () => {} }) {
+  constructor({ preload, log = () => {}, onStatus = () => {}, getSpan = () => null }) {
+    this.getSpan = getSpan;
     this.preload = preload;
     this.log = log;
     this.onStatus = onStatus;
@@ -146,6 +147,12 @@ class WallpaperManager {
     win.webContents.send('wallpaper:suspend', this.suspended);
     win.webContents.send('wallpaper:hidden', this.covered.has(win.__displayId));
     win.webContents.send('wallpaper:pause', this.paused);
+    win.webContents.send('wallpaper:span', this.getSpan(win.__displayId));
+  }
+
+  /** Re-send which part of a spanned background each monitor shows. */
+  updateSpan() {
+    for (const win of this.windows.values()) if (!win.isDestroyed()) win.webContents.send('wallpaper:span', this.getSpan(win.__displayId));
   }
 
   /** `rects` – physical monitor rects that are fully covered by windows. */
@@ -182,6 +189,13 @@ class WallpaperManager {
   relayLightning(senderId, distance) {
     for (const win of this.windows.values()) {
       if (!win.isDestroyed() && win.webContents.id !== senderId) win.webContents.send('wallpaper:lightning', distance);
+    }
+  }
+
+  /** Music level from the primary wallpaper to the other monitors. */
+  relayMusic(senderId, level) {
+    for (const win of this.windows.values()) {
+      if (!win.isDestroyed() && win.webContents.id !== senderId) win.webContents.send('wallpaper:music', level);
     }
   }
 

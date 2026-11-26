@@ -6,7 +6,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell, screen, protocol, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell, screen, protocol, globalShortcut, session, desktopCapturer } = require('electron');
 const { SettingsStore } = require('./settings-store');
 const { WallpaperManager } = require('./wallpaper-manager');
 const { SystemMonitor } = require('./system-monitor');
@@ -18,6 +18,8 @@ const updater = require('./updater');
 const { Screensaver } = require('./screensaver');
 const gallery = require('./gallery-manager');
 const online = require('./online');
+const { NowPlaying } = require('./now-playing');
+const { ChromaRGB } = require('./rgb');
 const t = (x) => i18n.t(x);
 const win32 = require('./win32');
 
@@ -43,7 +45,8 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(init);
 }
 
-let store, wallpapers, monitor, tray, settingsWin, logFile, screensaver;
+let store, wallpapers, monitor, tray, settingsWin, logFile, screensaver, nowPlaying, rgb;
+let mediaInfo = null;
 let currentImage = { key: 'none', source: null, path: null, name: null };
 const status = { suspended: false, reason: null, paused: false, fps: 0, error: null };
 
@@ -102,6 +105,22 @@ function imagePathFor(displayId) {
   return (displayId && currentImage.displays[displayId]) || currentImage.path;
 }
 
+/**
+ * "Span across monitors": the same image is stretched over the bounding box of
+ * all monitors and every monitor shows its own part. Only for one shared image.
+ */
+function spanFor(displayId) {
+  const s = store.get();
+  const all = screen.getAllDisplays();
+  if (!s.spanMonitors || all.length < 2 || currentImage.source !== 'custom') return null;
+  const minX = Math.min(...all.map((d) => d.bounds.x)), minY = Math.min(...all.map((d) => d.bounds.y));
+  const maxX = Math.max(...all.map((d) => d.bounds.x + d.bounds.width)), maxY = Math.max(...all.map((d) => d.bounds.y + d.bounds.height));
+  const W = maxX - minX, H = maxY - minY;
+  const d = all.find((x) => x.id === displayId);
+  if (!d) return null;
+  return { x: (d.bounds.x - minX) / W, y: (d.bounds.y - minY) / H, w: d.bounds.width / W, h: d.bounds.height / H, aspect: W / H };
+}
+
 /** Settings as sent to renderers: plus which image is effectively shown. */
 function withImage(settings) {
   return { ...settings, imageKey: currentImage.key, imageSource: currentImage.source };
@@ -116,6 +135,7 @@ function refreshImage(force = false) {
   const s = withImage(store.get());
   wallpapers.broadcast('settings:changed', s, ['imageKey']);
   sendToSettings('settings:changed', s, ['imageKey']);
+  wallpapers.updateSpan();
   return true;
 }
 
@@ -234,6 +254,97 @@ async function setGallery(ref, matchLook = store.get().galleryMatchLook) {
   return applySettings({ backgroundPath: ref });
 }
 
+/* --------------------------------------------------------------- taskbar */
+
+let taskbarTimer = null;
+let taskbarActive = false;
+const PERSONALIZE = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize';
+
+function regQueryLightTheme() {
+  try {
+    const out = require('child_process').execFileSync('reg', ['query', PERSONALIZE, '/v', 'SystemUsesLightTheme'], { windowsHide: true, encoding: 'utf8' });
+    const m = /SystemUsesLightTheme\s+REG_DWORD\s+0x([0-9a-f]+)/i.exec(out);
+    return m ? parseInt(m[1], 16) : 0;
+  } catch { return -1; }
+}
+
+function regSetLightTheme(value) {
+  if (process.platform !== 'win32') return;
+  try {
+    require('child_process').execFileSync('reg', ['add', PERSONALIZE, '/v', 'SystemUsesLightTheme', '/t', 'REG_DWORD', '/d', String(value), '/f'], { windowsHide: true });
+  } catch (e) { log('taskbar: could not change system theme: ' + e.message); }
+}
+
+/**
+ * See-through taskbar so the rain continues underneath. 'default' leaves the
+ * taskbar completely to Windows. With light icons on, Windows' system theme is
+ * switched to dark while the effect is active (white clock and icons) and the
+ * user's original value is restored afterwards – also after a crash, because
+ * it is remembered in the settings.
+ */
+function startTaskbar() {
+  clearInterval(taskbarTimer);
+  taskbarTimer = null;
+  const s = store.get();
+  const wantLight = s.taskbarStyle !== 'default' && s.taskbarLightIcons;
+  if (process.platform === 'win32') {
+    if (wantLight && s.taskbarSavedTheme < 0) {
+      const cur = regQueryLightTheme();
+      if (cur >= 0) {
+        store.update({ taskbarSavedTheme: cur });
+        if (cur !== 0) regSetLightTheme(0);
+      }
+    } else if (!wantLight && s.taskbarSavedTheme >= 0) {
+      regSetLightTheme(s.taskbarSavedTheme);
+      store.update({ taskbarSavedTheme: -1 });
+    }
+  }
+  if (s.taskbarStyle === 'default') {
+    if (taskbarActive) win32.restoreTaskbar();
+    taskbarActive = false;
+    log('taskbar: Windows default');
+    return;
+  }
+  taskbarActive = true;
+  if (wantLight) win32.restoreTaskbar(); // let Explorer pick up the dark theme first
+  const n = win32.setTaskbarStyle(s.taskbarStyle);
+  log(`taskbar: ${s.taskbarStyle}${wantLight ? ' + light icons' : ''} (${n} taskbar${n === 1 ? '' : 's'})`);
+  taskbarTimer = setInterval(() => win32.setTaskbarStyle(store.get().taskbarStyle), 400);
+}
+
+function stopTaskbar() {
+  clearInterval(taskbarTimer);
+  const s = store && store.get();
+  if (!s) return;
+  if (s.taskbarSavedTheme >= 0) { regSetLightTheme(s.taskbarSavedTheme); store.update({ taskbarSavedTheme: -1 }); store.flush(); }
+  if (taskbarActive) win32.restoreTaskbar();
+}
+
+/* ------------------------------------------- music, widget, RGB lighting */
+
+function startExtras() {
+  // System audio for "react to music": loopback capture (Windows) without any picker.
+  if (process.platform === 'win32') {
+    session.defaultSession.setDisplayMediaRequestHandler((_req, cb) => {
+      desktopCapturer.getSources({ types: ['screen'] })
+        .then((sources) => cb({ video: sources[0], audio: 'loopback' }))
+        .catch(() => cb({}));
+    });
+  }
+  nowPlaying = new NowPlaying({
+    log,
+    onChange: (info) => { mediaInfo = info; wallpapers.broadcast('widget:media', info); },
+  });
+  rgb = new ChromaRGB({ log });
+  syncExtras();
+}
+
+function syncExtras() {
+  const s = store.get();
+  if (s.widgetMedia && s.wallpaperEnabled) nowPlaying.start(); else nowPlaying.stop();
+  if (s.rgbEnabled) rgb.start(); else rgb.stop();
+}
+
 /* --------------------------------------------------------------- hotkeys */
 
 function registerHotkeys() {
@@ -349,7 +460,7 @@ function init() {
   try { fs.writeFileSync(logFile, ''); } catch { /* ignore */ }
   log(`start v${app.getVersion()} ${process.platform} ${os.release()} electron ${process.versions.electron}`);
   log(`win32 integration: ${require('./win32').isAvailable() ? 'ok' : 'unavailable'}`);
-  wallpapers = new WallpaperManager({ preload: PRELOAD, log, onStatus: () => pushStatus() });
+  wallpapers = new WallpaperManager({ preload: PRELOAD, log, onStatus: () => pushStatus(), getSpan: spanFor });
   monitor = new SystemMonitor({
     getSettings: () => store.get(),
     getOwnHandles: () => wallpapers.ownHandles(),
@@ -365,6 +476,8 @@ function init() {
   screensaver.start();
   monitor.isScreensaver = () => screensaver.active;
   startScheduler();
+  startTaskbar();
+  startExtras();
   startMetrics();
   registerHotkeys();
   updater.init({ log, getSettings: () => store.get(), onState: () => { pushStatus(); updateTrayMenu(); } });
@@ -523,6 +636,9 @@ function applySettings(partial, origin) {
     if (settingsWin && !settingsWin.isDestroyed()) setTimeout(() => settingsWin.reload(), 150);
   }
   if (changed.includes('hotkeysEnabled')) registerHotkeys();
+  if (changed.includes('taskbarStyle') || changed.includes('taskbarLightIcons')) startTaskbar();
+  if (changed.some((k) => ['widgetMedia', 'rgbEnabled', 'wallpaperEnabled'].includes(k))) syncExtras();
+  if (changed.includes('spanMonitors') || changed.includes('backgroundPath') || changed.includes('useSystemWallpaper')) wallpapers.updateSpan();
   if (changed.includes('schedule') || changed.includes('scheduleEnabled')) runSchedule(true);
   if (changed.includes('autoDayNight') && settings.autoDayNight) updateDayNight();
   if (changed.some((k) => ['soundEnabled', 'wallpaperEnabled', 'startWithWindows'].includes(k))) updateTrayMenu();
@@ -601,13 +717,20 @@ function registerIpc() {
   ipcMain.handle('rain:pause', (_e, p) => setPaused(p));
   ipcMain.handle('rain:reset', () => wallpapers.broadcast('wallpaper:reset'));
 
-  ipcMain.on('wallpaper:lightning', (e, distance) => wallpapers.relayLightning(e.sender.id, Number(distance) || 0.5));
+  ipcMain.on('wallpaper:lightning', (e, distance) => {
+    const d = Number(distance);
+    wallpapers.relayLightning(e.sender.id, Number.isFinite(d) ? d : 0.5);
+    if (rgb) rgb.flash(1 - (Number.isFinite(d) ? d : 0.5));
+  });
+  ipcMain.on('music:level', (e, level) => wallpapers.relayMusic(e.sender.id, Number(level) || 0));
+  ipcMain.handle('widget:media', () => mediaInfo);
   ipcMain.on('wallpaper:fps', (_e, fps) => {
     status.fps = Number(fps) || 0;
     if (status.fps) fpsSamples.push(status.fps);
     sendToSettings('status:changed', fullStatus());
   });
   ipcMain.on('wallpaper:error', (_e, msg) => {
+    if (/^Music:/.test(msg)) { log('[wallpaper] ' + msg); return; } // optional feature, not a wallpaper failure
     status.error = msg;
     log('[wallpaper] ' + msg);
     pushStatus();
@@ -658,7 +781,9 @@ function registerIpc() {
   ipcMain.handle('online:search', (_e, q) => online.search(store.get(), q || {}));
   ipcMain.handle('online:history', () => online.history());
   ipcMain.handle('online:use', async (_e, item) => {
-    const file = await online.download(item, (p) => sendToSettings('online:progress', { id: item.id, progress: p }));
+    const s = store.get();
+    const quality = item && item.type === 'video' ? s.onlineVideoQuality : s.onlinePhotoQuality;
+    const file = await online.download(item, (p) => sendToSettings('online:progress', { id: item.id, progress: p }), quality);
     return applySettings({ backgroundPath: file });
   });
   ipcMain.handle('online:open', (_e, url) => {
@@ -694,6 +819,9 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => globalShortcut.unregisterAll());
 
 app.on('before-quit', () => {
+  stopTaskbar();
+  if (nowPlaying) nowPlaying.stop();
+  if (rgb) rgb.stop();
   if (monitor) monitor.stop();
   if (store) store.flush();
   if (wallpapers) wallpapers.shutdown();

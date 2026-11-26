@@ -27,8 +27,11 @@
   uniform vec2 uPos;           // focal point 0..1 (y: 0 = top)
   uniform float uZoom;
   uniform float uBrightness;
+  uniform vec4 uSpan;          // this monitor's part of the spanned desktop (x, y, w, h; y from top)
+  uniform float uSpanAspect;   // aspect of the whole spanned desktop (0 = not spanning)
   void main() {
-    float ac = uCanvasSize.x / uCanvasSize.y;
+    float ac = uSpanAspect > 0.0 ? uSpanAspect : uCanvasSize.x / uCanvasSize.y;
+    vec2 cuv = uSpanAspect > 0.0 ? vec2(uSpan.x + vUv.x * uSpan.z, 1.0 - uSpan.y - uSpan.w + vUv.y * uSpan.w) : vUv;
     float ai = uImageSize.x / uImageSize.y;
     vec2 sz;
     if (uFitMode == 0) sz = ai > ac ? vec2(ai / ac, 1.0) : vec2(1.0, ac / ai);
@@ -37,12 +40,12 @@
     sz *= uZoom;
     vec2 pos = vec2(uPos.x, 1.0 - uPos.y);
     vec2 origin = (1.0 - sz) * pos;
-    vec2 iuv = (vUv - origin) / sz;
+    vec2 iuv = (cuv - origin) / sz;
     vec2 tuv = vec2(iuv.x, 1.0 - iuv.y);
     vec3 col;
     if (any(lessThan(iuv, vec2(0.0))) || any(greaterThan(iuv, vec2(1.0)))) {
       // Letterbox area for "Fit": a dark, very blurred ambient version of the image.
-      vec2 amb = vec2(vUv.x, 1.0 - vUv.y);
+      vec2 amb = vec2(cuv.x, 1.0 - cuv.y);
       col = textureLod(uImage, amb, 7.0).rgb * 0.35;
     } else {
       col = texture(uImage, tuv).rgb;
@@ -94,6 +97,7 @@
   uniform float uFrost;        // ice crystals on the glass
   uniform vec2 uParallax;      // background offset (cursor parallax)
   uniform float uPZoom;        // background over-scan for parallax
+  uniform float uPulse;        // music level: lights behind the glass pulse
 
   float hash(vec2 p) {
     p = fract(p * vec2(123.34, 456.21));
@@ -265,6 +269,12 @@
     float sheen = smoothstep(0.0, 1.0, 1.0 - uv.y) * 0.03
                 + smoothstep(0.08, 0.0, abs(fract((uv.x * 0.6 + uv.y) * 0.9 - 0.2) - 0.5) - 0.32) * 0.025;
     col += sheen * uReflection * (0.5 + luma(gBlur));
+
+    // ---- music: bright lights (bokeh, lamps, windows) pulse with the beat ---
+    if (uPulse > 0.001) {
+      float bright = smoothstep(0.35, 0.9, luma(gBlur));
+      col += (gBlur * 0.55 + 0.04) * bright * uPulse * 0.9 + col * uPulse * 0.06;
+    }
 
     // ---- lightning ----------------------------------------------------------
     col += uFlash * (col * 0.9 + vec3(0.16, 0.17, 0.2) + gBlur * 0.4 + cov * 0.25);

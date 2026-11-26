@@ -29,6 +29,8 @@ function load() {
 
     const RECT = koffi.struct('RECT', { left: 'int32', top: 'int32', right: 'int32', bottom: 'int32' });
     const POINT = koffi.struct('POINT', { x: 'int32', y: 'int32' });
+    koffi.struct('ACCENT_POLICY', { AccentState: 'int32', AccentFlags: 'int32', GradientColor: 'uint32', AnimationId: 'int32' });
+    koffi.struct('WINCOMPATTRDATA', { Attribute: 'int32', Data: 'void *', SizeOfData: 'uint32' });
     const MONITORINFO = koffi.struct('MONITORINFO', { cbSize: 'uint32', rcMonitor: RECT, rcWork: RECT, dwFlags: 'uint32' });
     const EnumWindowsProc = koffi.proto('bool __stdcall EnumWindowsProc(intptr_t hwnd, intptr_t lParam)');
 
@@ -59,6 +61,8 @@ function load() {
       OpenProcess: kernel32.func('intptr_t __stdcall OpenProcess(uint32 access, bool inherit, uint32 pid)'),
       QueryFullProcessImageNameW: kernel32.func('bool __stdcall QueryFullProcessImageNameW(intptr_t proc, uint32 flags, _Out_ uint16_t *buf, _Inout_ uint32 *size)'),
       CloseHandle: kernel32.func('bool __stdcall CloseHandle(intptr_t h)'),
+      SendMessageTimeoutStr: user32.func('intptr_t __stdcall SendMessageTimeoutW(intptr_t hwnd, uint32 msg, uintptr_t wParam, str16 lParam, uint32 flags, uint32 timeout, void *result)'),
+      SetWindowCompositionAttribute: user32.func('bool __stdcall SetWindowCompositionAttribute(intptr_t hwnd, WINCOMPATTRDATA *data)'),
       IsIconic: user32.func('bool __stdcall IsIconic(intptr_t hwnd)'),
       IsZoomed: user32.func('bool __stdcall IsZoomed(intptr_t hwnd)'),
       GetWindowTextLengthW: user32.func('int __stdcall GetWindowTextLengthW(intptr_t hwnd)'),
@@ -329,6 +333,59 @@ function getForegroundProcessName() {
   }
 }
 
+/**
+ * Taskbar look (like TranslucentTB): 'default' | 'clear' | 'blur' | 'acrylic'.
+ * Explorer resets the accent now and then, so the caller re-applies it periodically.
+ * Returns the number of taskbars changed.
+ */
+let accentBuf = null;
+function setTaskbarStyle(style) {
+  const a = load();
+  if (!a) return 0;
+  try {
+    const k = a.koffi;
+    const states = { default: 0, clear: 2, blur: 3, acrylic: 4 };
+    const policy = {
+      AccentState: states[style] ?? 0,
+      AccentFlags: style === 'default' ? 0 : 2,
+      // ABGR; acrylic needs a little alpha to show, clear/blur use none.
+      GradientColor: style === 'acrylic' ? 0x55101010 : 0x00000000, // acrylic: light dark tint keeps icons readable
+      AnimationId: 0,
+    };
+    if (!accentBuf) accentBuf = k.alloc('ACCENT_POLICY', 1);
+    k.encode(accentBuf, 'ACCENT_POLICY', policy);
+    const data = { Attribute: 19 /* WCA_ACCENT_POLICY */, Data: accentBuf, SizeOfData: 16 };
+    const bars = [];
+    const main = a.FindWindowW('Shell_TrayWnd', null);
+    if (main) bars.push(main);
+    a.EnumWindows((hwnd) => {
+      if (className(a, hwnd) === 'Shell_SecondaryTrayWnd') bars.push(hwnd);
+      return true;
+    }, 0);
+    for (const h of bars) a.SetWindowCompositionAttribute(h, data);
+    return bars.length;
+  } catch (e) {
+    return 0;
+  }
+}
+
+/**
+ * Give the taskbar back to Windows: Explorer re-applies its own look (incl.
+ * transparency / accent colour) when the theme-changed notifications arrive.
+ */
+function restoreTaskbar() {
+  const a = load();
+  if (!a) return;
+  try {
+    const bars = [];
+    const main = a.FindWindowW('Shell_TrayWnd', null);
+    if (main) bars.push(main);
+    a.EnumWindows((hwnd) => { if (className(a, hwnd) === 'Shell_SecondaryTrayWnd') bars.push(hwnd); return true; }, 0);
+    for (const h of bars) a.SendMessageTimeoutW(h, 0x031a /* WM_THEMECHANGED */, 0, 0, 0x2, 500, null);
+    a.SendMessageTimeoutStr(0xffff /* HWND_BROADCAST */, 0x001a /* WM_SETTINGCHANGE */, 0, 'ImmersiveColorSet', 0x2 /* ABORTIFHUNG */, 1000, null);
+  } catch { /* ignore */ }
+}
+
 /* ---------------- per-monitor wallpapers (IDesktopWallpaper COM) ---------------- */
 
 const guid = (d1, d2, d3, d4) => ({ d1, d2, d3, d4 });
@@ -415,4 +472,4 @@ function handleToNumber(handle) {
   try { return hwndFromBuffer(handle); } catch { return 0; }
 }
 
-module.exports = { getForegroundProcessName, getDesktopCursor, attachToDesktop, restack, getSystemWallpaperPath, getMonitorWallpapers, getCoveredMonitors, sendToBottom, getFullscreenState, refreshDesktop, handleToNumber, isAvailable: () => !!load() };
+module.exports = { setTaskbarStyle, restoreTaskbar, getForegroundProcessName, getDesktopCursor, attachToDesktop, restack, getSystemWallpaperPath, getMonitorWallpapers, getCoveredMonitors, sendToBottom, getFullscreenState, refreshDesktop, handleToNumber, isAvailable: () => !!load() };

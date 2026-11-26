@@ -58,6 +58,7 @@
         { title: t('Layout'), items: [
           seg('fitMode', t('Scaling'), [['fill', t('Fill')], ['fit', t('Fit')], ['stretch', t('Stretch')]], { hint: t('Fill crops to cover the monitor, Fit shows the whole image.') }),
           slider('bgZoom', t('Zoom'), { min: 100, max: 200 }),
+          toggle('spanMonitors', t('Span across all monitors'), { hint: t('One image stretched over all monitors (custom image, gallery or online background).') }),
           slider('bgPosX', t('Horizontal position'), { unit: '', format: (v) => (v < 45 ? t('Left ') : v > 55 ? t('Right ') : t('Center ')) + Math.round(v) }),
           slider('bgPosY', t('Vertical position'), { unit: '', format: (v) => (v < 45 ? t('Top ') : v > 55 ? t('Bottom ') : t('Center ')) + Math.round(v) }),
         ] },
@@ -130,6 +131,20 @@
           slider('thunderFrequency', t('Thunder frequency'), { dependsOn: 'thunderEnabled', unit: '', format: (v) => (v < 25 ? t('Rarely') : v < 60 ? t('Sometimes') : v < 85 ? t('Often') : t('Very often')) + ' · ' + Math.round(v) }),
           toggle('lightning', t('Lightning flashes'), { dependsOn: 'thunderEnabled' }),
         ] },
+        { title: t('Music'), items: [
+          toggle('musicReactive', t('React to music'), { hint: t('Lights behind the glass pulse with whatever plays on your PC (Spotify, YouTube, games).') }),
+          slider('musicSensitivity', t('Sensitivity'), { dependsOn: 'musicReactive' }),
+          slider('musicGlow', t('Light pulsing'), { dependsOn: 'musicReactive' }),
+          toggle('musicLightning', t('Lightning on strong beats'), { dependsOn: 'musicReactive' }),
+        ] },
+        { title: t('Desktop widget'), items: [
+          toggle('widgetClock', t('Clock')),
+          toggle('widgetMedia', t('Now playing'), { hint: t('Shows the song playing in Spotify, the browser or another player.') }),
+          { type: 'select', key: 'widgetPosition', label: t('Position'), options: [['top-left', t('Top left')], ['top-right', t('Top right')], ['bottom-left', t('Bottom left')], ['bottom-right', t('Bottom right')], ['center', t('Center')]] },
+        ] },
+        { title: t('RGB lighting'), items: [
+          toggle('rgbEnabled', t('Razer Chroma'), { hint: t('Keyboard, mouse and headset glow rain blue and flash white with every lightning strike. Needs Razer Synapse.') }),
+        ] },
         { title: t('Color'), items: [
           toggle('autoDayNight', t('Automatic day / night'), { hint: t('Follows the sun at your location (weather city, otherwise your time zone).') }),
           slider('dayNight', t('Day / Night'), { disabledBy: 'autoDayNight', unit: '', format: (v) => (v < 40 ? t('Night ') : v > 60 ? t('Day ') : t('Neutral ')) + Math.round(v) }),
@@ -150,6 +165,8 @@
           toggle('pauseOnFullscreen', t('Pause when a fullscreen app or game runs')),
           toggle('pauseWhenCovered', t('Pause on monitors covered by maximized windows'), { hint: t('Saves GPU while you work; sound keeps playing.') }),
           toggle('pauseOnBattery', t('Pause on battery power')),
+          seg('taskbarStyle', t('Taskbar'), [['default', t('Default')], ['clear', t('Clear')], ['blur', t('Blur')], ['acrylic', t('Frosted')]], { hint: t('Makes the taskbar see-through so the rain keeps running underneath it. Works best on Windows 10 and Windows 11 21H2; newer Windows 11 builds may partly ignore it.') }),
+          toggle('taskbarLightIcons', t('White clock and icons on the taskbar'), { dependsOn: (st) => st.taskbarStyle !== 'default', hint: t('Switches Windows to dark mode while the see-through taskbar is on and restores your setting afterwards.') }),
           toggle('hotkeysEnabled', t('Global shortcuts'), { hint: t('Ctrl+Alt+R pause / resume rain · Ctrl+Alt+W wallpaper on / off · Ctrl+Alt+S open settings') }),
           { type: 'text', key: 'pauseApps', label: t('Pause for these apps'), placeholder: 'photoshop.exe, premiere.exe', hint: t('Comma separated program names. The wallpaper pauses while one of them is in front.') },
         ] },
@@ -251,7 +268,8 @@
     for (const sec of SECTIONS) for (const g of sec.groups) for (const it of g.items) {
       if (!it.dependsOn && !it.disabledBy && !it.disabled) continue;
       const c = controls.get(it.key);
-      const off = it.disabled || (it.dependsOn && !settings[it.dependsOn]) || (it.disabledBy && settings[it.disabledBy]);
+      const dep = typeof it.dependsOn === 'function' ? it.dependsOn(settings) : settings[it.dependsOn];
+      const off = it.disabled || (it.dependsOn && !dep) || (it.disabledBy && settings[it.disabledBy]);
       if (c) c.row.classList.toggle('disabled', !!off);
     }
   }
@@ -370,7 +388,7 @@
   function renderTypeSeg() { for (const b of typeSeg.children) b.classList.toggle('active', b.__v === onl.type); }
   renderTypeSeg();
   const CATS = [['rainy street', t('Rain')], ['city night', t('Night city')], ['forest fog', t('Forest')], ['mountains lake', t('Mountains')],
-    ['snow winter', t('Snow')], ['cozy cabin', t('Cozy')], ['autumn', t('Autumn')], ['ocean waves', t('Ocean')], ['neon', t('Neon')]];
+    ['snow winter', t('Snow')], ['cozy cabin', t('Cozy')], ['autumn', t('Autumn')], ['ocean waves', t('Ocean')], ['neon', t('Neon')], ['abstract', t('Abstract')]];
   const chips = h('div', { class: 'chips' }, CATS.map(([q, label]) => h('button', { class: 'chip-btn', onclick: () => { searchInput.value = q; onl.query = q; onlineSearch(true); } }, label)));
 
   function onlineCard(it, fromHistory) {
@@ -392,7 +410,7 @@
     };
     return h('div', { class: 'preset-card' },
       h('div', { class: 'preset-thumb', style: `background-image:url(${it.thumb})`, onclick: use, title: it.tags || '' },
-        it.type === 'video' ? h('span', { class: 'thumb-badge' }, '▶ ' + (it.duration ? it.duration + ' s' : '')) : null,
+        it.type === 'video' ? h('span', { class: 'thumb-badge' }, '▶ ' + (it.duration ? it.duration + ' s' : '') + (it.maxLabel ? ' · ' + it.maxLabel : '')) : null,
         p !== undefined ? h('span', { class: 'thumb-progress' }, Math.round(p * 100) + ' %') : null),
       h('div', { class: 'preset-meta' },
         h('div', { class: 'preset-name', title: it.user }, it.user || 'Pixabay'),
@@ -450,6 +468,8 @@
       h('div', { class: 'row' },
         h('div', { class: 'preset-save' }, searchInput, h('button', { class: 'btn primary', onclick: () => { onl.query = searchInput.value; onlineSearch(true); } }, icon('search'), t('Search'))),
         h('div', { style: 'display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap' }, typeSeg, chips)),
+      buildControl({ type: 'select', key: 'onlinePhotoQuality', label: t('Photo resolution'), options: [['best', t('Best available')], ['1280', '1280 px'], ['640', '640 px']] }),
+      buildControl({ type: 'select', key: 'onlineVideoQuality', label: t('Video resolution'), options: [['best', t('Best available')], ['2160', '4K (2160p)'], ['1080', '1080p'], ['720', '720p'], ['540', '540p']] }),
       h('div', { class: 'row' }, onlineInfo, onlineGrid, onlineMore)),
     historyGroup,
     h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, t('Own API key (optional)')),

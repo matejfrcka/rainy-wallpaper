@@ -37,24 +37,46 @@ function writeIndex(list) {
 }
 
 function mapPhoto(h) {
+  // Standard keys get up to 1280 px; fullHD/original only with Pixabay "full API access".
+  const sizes = [
+    { q: '640', url: h.webformatURL, width: 640 },
+    { q: '1280', url: h.largeImageURL, width: 1280 },
+    h.fullHDURL ? { q: '1920', url: h.fullHDURL, width: 1920 } : null,
+    h.imageURL ? { q: 'original', url: h.imageURL, width: h.imageWidth } : null,
+  ].filter((x) => x && x.url);
   return {
     id: 'pxp-' + h.id, type: 'photo', provider: 'Pixabay',
-    thumb: h.webformatURL, full: h.largeImageURL,
-    width: h.imageWidth, height: h.imageHeight,
+    thumb: h.webformatURL, full: sizes[sizes.length - 1].url, sizes,
+    width: h.imageWidth, height: h.imageHeight, maxLabel: sizes[sizes.length - 1].width + ' px',
     user: h.user, page: h.pageURL, tags: h.tags,
   };
 }
 
 function mapVideo(h) {
   const v = h.videos || {};
-  // Best rendition that is at least Full HD when available.
-  const pick = [v.large, v.medium, v.small].find((x) => x && x.url && x.width >= 1920) || v.large || v.medium || v.small || v.tiny;
+  const sizes = ['tiny', 'small', 'medium', 'large'].map((k) => v[k]).filter((x) => x && x.url)
+    .map((x) => ({ url: x.url, width: x.width, height: x.height })).sort((p, q) => p.height - q.height);
+  const best = sizes[sizes.length - 1] || {};
+  const label = (hgt) => (hgt >= 2160 ? '4K' : hgt + 'p');
   return {
     id: 'pxv-' + h.id, type: 'video', provider: 'Pixabay',
     thumb: (v.medium && v.medium.thumbnail) || (v.tiny && v.tiny.thumbnail) || '',
-    full: pick && pick.url, width: pick && pick.width, height: pick && pick.height,
+    full: best.url, sizes, width: best.width, height: best.height, maxLabel: best.height ? label(best.height) : '',
     duration: h.duration, user: h.user, page: h.pageURL, tags: h.tags,
   };
+}
+
+/** Pick the rendition for the wanted quality ('best' or a max size). */
+function pickSize(item, quality) {
+  const sizes = item.sizes && item.sizes.length ? item.sizes : [{ url: item.full, width: item.width, height: item.height, q: 'best' }];
+  if (!quality || quality === 'best') return sizes[sizes.length - 1];
+  if (item.type === 'video') {
+    const max = Number(quality);
+    const fit = sizes.filter((x) => x.height <= max);
+    return fit.length ? fit[fit.length - 1] : sizes[0];
+  }
+  const fit = sizes.filter((x) => x.q !== 'original' && x.width <= Number(quality));
+  return fit.length ? fit[fit.length - 1] : sizes[0];
 }
 
 /**
@@ -83,12 +105,15 @@ async function search(settings, { type = 'photo', query = '', page = 1 } = {}) {
 }
 
 /** Download a result into the local library; onProgress(0..1). Returns the file path. */
-async function download(item, onProgress = () => {}) {
-  if (!item || !/^px[pv]-\d+$/.test(item.id) || !/^https:\/\/(cdn\.)?pixabay\.com\//.test(item.full)) throw new Error('Invalid item');
+async function download(item, onProgress = () => {}, quality = 'best') {
+  if (!item || !/^px[pv]-\d+$/.test(item.id)) throw new Error('Invalid item');
+  const size = pickSize(item, quality);
+  if (!size || !/^https:\/\/(cdn\.)?pixabay\.com\//.test(size.url)) throw new Error('Invalid item');
   fs.mkdirSync(dir(), { recursive: true });
-  const file = path.join(dir(), item.id + (item.type === 'video' ? '.mp4' : '.jpg'));
+  const tag = item.type === 'video' ? (size.height || 'v') : (size.q || size.width || 'p');
+  const file = path.join(dir(), `${item.id}-${tag}${item.type === 'video' ? '.mp4' : '.jpg'}`);
   if (!fs.existsSync(file)) {
-    const res = await net.fetch(item.full);
+    const res = await net.fetch(size.url);
     if (!res.ok) throw new Error('Download failed: HTTP ' + res.status);
     const total = Number(res.headers.get('content-length')) || 0;
     const tmp = file + '.part';
