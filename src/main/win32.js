@@ -24,6 +24,7 @@ function load() {
     const shell32 = koffi.load('shell32.dll');
     const dwmapi = koffi.load('dwmapi.dll');
     const ole32 = koffi.load('ole32.dll');
+    const kernel32 = koffi.load('kernel32.dll');
     const GUID = koffi.struct('GUID', { d1: 'uint32', d2: 'uint16', d3: 'uint16', d4: koffi.array('uint8', 8) });
 
     const RECT = koffi.struct('RECT', { left: 'int32', top: 'int32', right: 'int32', bottom: 'int32' });
@@ -54,6 +55,10 @@ function load() {
       SystemParametersInfoW: user32.func('bool __stdcall SystemParametersInfoW(uint32 action, uint32 param, _Inout_ uint16_t *pv, uint32 winIni)'),
       GetCursorPos: user32.func('bool __stdcall GetCursorPos(_Out_ POINT *pt)'),
       WindowFromPoint: user32.func('intptr_t __stdcall WindowFromPoint(POINT pt)'),
+      GetWindowThreadProcessId: user32.func('uint32 __stdcall GetWindowThreadProcessId(intptr_t hwnd, _Out_ uint32 *pid)'),
+      OpenProcess: kernel32.func('intptr_t __stdcall OpenProcess(uint32 access, bool inherit, uint32 pid)'),
+      QueryFullProcessImageNameW: kernel32.func('bool __stdcall QueryFullProcessImageNameW(intptr_t proc, uint32 flags, _Out_ uint16_t *buf, _Inout_ uint32 *size)'),
+      CloseHandle: kernel32.func('bool __stdcall CloseHandle(intptr_t h)'),
       IsIconic: user32.func('bool __stdcall IsIconic(intptr_t hwnd)'),
       IsZoomed: user32.func('bool __stdcall IsZoomed(intptr_t hwnd)'),
       GetWindowTextLengthW: user32.func('int __stdcall GetWindowTextLengthW(intptr_t hwnd)'),
@@ -298,6 +303,32 @@ function getDesktopCursor(ownHandles = new Set()) {
   }
 }
 
+/** File name (lower case, e.g. "photoshop.exe") of the app owning the foreground window. */
+function getForegroundProcessName() {
+  const a = load();
+  if (!a) return null;
+  try {
+    const fg = a.GetForegroundWindow();
+    if (!fg) return null;
+    const pid = [0];
+    a.GetWindowThreadProcessId(fg, pid);
+    if (!pid[0]) return null;
+    const h = a.OpenProcess(0x1000 /* PROCESS_QUERY_LIMITED_INFORMATION */, false, pid[0]);
+    if (!h) return null;
+    try {
+      const buf = new Uint16Array(1024);
+      const size = [1024];
+      if (!a.QueryFullProcessImageNameW(h, 0, buf, size)) return null;
+      const full = String.fromCharCode(...buf.subarray(0, size[0]));
+      return full.split('\\').pop().toLowerCase();
+    } finally {
+      a.CloseHandle(h);
+    }
+  } catch {
+    return null;
+  }
+}
+
 /* ---------------- per-monitor wallpapers (IDesktopWallpaper COM) ---------------- */
 
 const guid = (d1, d2, d3, d4) => ({ d1, d2, d3, d4 });
@@ -384,4 +415,4 @@ function handleToNumber(handle) {
   try { return hwndFromBuffer(handle); } catch { return 0; }
 }
 
-module.exports = { getDesktopCursor, attachToDesktop, restack, getSystemWallpaperPath, getMonitorWallpapers, getCoveredMonitors, sendToBottom, getFullscreenState, refreshDesktop, handleToNumber, isAvailable: () => !!load() };
+module.exports = { getForegroundProcessName, getDesktopCursor, attachToDesktop, restack, getSystemWallpaperPath, getMonitorWallpapers, getCoveredMonitors, sendToBottom, getFullscreenState, refreshDesktop, handleToNumber, isAvailable: () => !!load() };

@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: rainmedia:; media-src 'self' blob: rainmedia:; connect-src 'self' blob: data: rainmedia:">
+  <title>Rainy Glass Screensaver</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; cursor: none; user-select: none; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+    .clock {
+      position: fixed; left: 6vw; bottom: 8vh; color: rgba(255,255,255,0.88);
+      font: 200 clamp(48px, 9vw, 160px)/1 "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+      letter-spacing: -0.02em; text-shadow: 0 2px 30px rgba(0,0,0,0.45);
+      opacity: 0; transition: opacity 1.5s;
+    }
+    .clock small { display: block; font-size: 0.22em; font-weight: 400; letter-spacing: 0.04em; margin-top: 0.6em; opacity: 0.8; }
+    .clock.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <canvas id="glass"></canvas>
+  <div class="clock" id="clock"></div>
+  <script src="../../shared/defaults.js"></script>
+  <script src="../../engine/shaders.js"></script>
+  <script src="../../engine/rain-simulation.js"></script>
+  <script src="../../engine/renderer.js"></script>
+  <script src="../../engine/audio.js"></script>
+  <script src="../../engine/engine.js"></script>
+  <script src="screensaver.js"></script>
+</body>
+</html>

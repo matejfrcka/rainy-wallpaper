@@ -62,6 +62,7 @@
         { title: t('Adjustments'), items: [
           slider('bgBrightness', t('Brightness'), { max: 200 }),
           slider('bgBlur', t('Blur')),
+          slider('parallax', t('Depth parallax'), { hint: t('The background moves slightly with the cursor, like looking through a real window.') }),
         ] },
       ],
     },
@@ -69,6 +70,7 @@
       id: 'rain', title: t('Rain'), lead: t('Physics of the water on the glass.'),
       groups: [
         { title: t('Amount'), items: [
+          seg('precipitation', t('Weather'), [['rain', t('Rain')], ['snow', t('Snow')]]),
           slider('rainIntensity', t('Rain intensity'), { hint: t('How often new drops hit the window.') }),
           slider('dropletDensity', t('Droplet density'), { hint: t('Tiny static droplets covering the glass.') }),
           slider('dropletSize', t('Droplet size')),
@@ -100,6 +102,7 @@
           slider('condensation', t('Condensation intensity'), { dependsOn: 'condensationEnabled' }),
           toggle('streaksEnabled', t('Rain streaks'), { hint: t('Out-of-focus rain falling outside.') }),
           slider('streaks', t('Streak intensity'), { dependsOn: 'streaksEnabled' }),
+          slider('frost', t('Frost'), { hint: t('Ice crystals grow from the window frame. Wipe them with the mouse.') }),
         ] },
       ],
     },
@@ -136,6 +139,13 @@
           toggle('pauseWhenCovered', t('Pause on monitors covered by maximized windows'), { hint: t('Saves GPU while you work; sound keeps playing.') }),
           toggle('pauseOnBattery', t('Pause on battery power')),
           toggle('hotkeysEnabled', t('Global shortcuts'), { hint: t('Ctrl+Alt+R pause / resume rain · Ctrl+Alt+W wallpaper on / off · Ctrl+Alt+S open settings') }),
+          { type: 'text', key: 'pauseApps', label: t('Pause for these apps'), placeholder: 'photoshop.exe, premiere.exe', hint: t('Comma separated program names. The wallpaper pauses while one of them is in front.') },
+        ] },
+        { title: t('Screensaver'), items: [
+          toggle('screensaverEnabled', t('Rain screensaver')),
+          slider('screensaverMinutes', t('Start after'), { min: 1, max: 120, unit: ' min', dependsOn: 'screensaverEnabled' }),
+          toggle('screensaverClock', t('Show clock'), { dependsOn: 'screensaverEnabled' }),
+          { type: 'button', label: t('Try screensaver'), onClick: () => api.testScreensaver() },
         ] },
         { title: t('Language'), items: [
           seg('language', t('Language'), [['auto', t('Automatic')], ['en', 'English'], ['sk', 'Slovenčina']]),
@@ -217,7 +227,7 @@
     for (const [key, c] of controls) c.update(settings[key]);
     refreshDependencies();
     loadPreviewImage();
-    if (document.querySelector('.section.active[data-id="presets"]')) renderPresets();
+    if (document.querySelector('.section.active[data-id="presets"]')) { renderPresets(); renderSchedule(); }
   }
 
   function refreshDependencies() {
@@ -261,6 +271,15 @@
       update = (v) => { input.checked = !!v; };
       input.addEventListener('change', () => change({ [it.key]: input.checked }));
       head.append(t);
+    } else if (it.type === 'text') {
+      const input = h('input', { type: 'text', placeholder: it.placeholder || '', maxlength: 600, style: 'margin-top:8px;width:100%' });
+      update = (v) => { if (document.activeElement !== input) input.value = v || ''; };
+      input.addEventListener('change', () => change({ [it.key]: input.value }));
+      row.append(input);
+    } else if (it.type === 'button') {
+      head.append(h('button', { class: 'btn small', onclick: it.onClick }, it.label));
+      labelBox.innerHTML = '';
+      update = () => {};
     } else if (it.type === 'segmented') {
       const box = h('div', { class: 'segmented' });
       const buttons = it.options.map(([value, label]) => {
@@ -273,7 +292,7 @@
       head.append(box);
     }
     update(settings[it.key]);
-    controls.set(it.key, { update, row });
+    controls.set(it.key || it.label, { update, row });
     return row;
   }
 
@@ -421,6 +440,58 @@
     h('div', { class: 'row' }, h('div', { class: 'preset-save' }, cityInput, h('button', { class: 'btn primary', onclick: searchWeather }, t('Set location'))), weatherInfo));
   renderWeather();
 
+  /* ---------------------------------------------- custom: sleep timer */
+  const sleepSeg = h('div', { class: 'segmented' });
+  const sleepInfo = h('div', { class: 'row-hint', style: 'margin-top:6px' });
+  for (const m of [0, 15, 30, 60, 90]) {
+    const b = h('button', { onclick: () => api.setSleep(m) }, m ? `${m} min` : t('Off'));
+    b.__m = m;
+    sleepSeg.append(b);
+  }
+  function renderSleep() {
+    const sl = status.sleep;
+    for (const b of sleepSeg.children) b.classList.toggle('active', sl ? b.__m === sl.minutes : b.__m === 0);
+    if (sl) {
+      const left = Math.max(0, Math.round((sl.endsAt - Date.now()) / 60000));
+      sleepInfo.textContent = `${t('Sound fades out in')} ${left} min`;
+    } else sleepInfo.textContent = t('The rain sound slowly fades out and turns off.');
+  }
+  const sleepBox = h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, t('Sleep timer')),
+    h('div', { class: 'row' }, h('div', { class: 'row-head' }, h('div', {}, h('div', { class: 'row-label' }, t('Turn off sound after'))), sleepSeg), sleepInfo));
+  renderSleep();
+  setInterval(renderSleep, 15000);
+
+  /* ------------------------------------------------- custom: scheduler */
+  const scheduleList = h('div');
+  function saveSchedule(list) { change({ schedule: list }); renderSchedule(); }
+  function renderSchedule() {
+    scheduleList.innerHTML = '';
+    const list = (settings.schedule || []).map((e) => ({ ...e }));
+    list.forEach((e, i) => {
+      const time = h('input', { type: 'time', value: e.time, class: 'time-input' });
+      time.addEventListener('change', () => { list[i].time = time.value || '08:00'; saveSchedule(list); });
+      const sel = h('select', { class: 'select' }, h('option', { value: '' }, t('Keep current look')),
+        presets.map((p) => h('option', { value: p.name, selected: p.name === e.preset ? '' : false }, p.name)));
+      sel.addEventListener('change', () => { list[i].preset = sel.value; saveSchedule(list); });
+      const imgBtn = h('button', { class: 'btn small', title: e.image || '', onclick: async () => {
+        const p = await api.pickScheduleImage(); if (p) { list[i].image = p; saveSchedule(list); }
+      } }, icon('image'), e.image ? e.image.split(/[\\/]/).pop().slice(0, 14) : t('Image'));
+      const clearImg = e.image ? h('button', { class: 'btn small ghost', title: t('Keep current image'), onclick: () => { list[i].image = ''; saveSchedule(list); } }, '×') : null;
+      const del = h('button', { class: 'btn small danger', title: t('Delete'), onclick: () => { list.splice(i, 1); saveSchedule(list); } }, icon('trash'));
+      scheduleList.append(h('div', { class: 'schedule-row' }, time, sel, imgBtn, clearImg, del));
+    });
+    scheduleList.append(h('button', { class: 'btn small', style: 'margin-top:8px', onclick: () => {
+      const last = list[list.length - 1];
+      const next = last ? `${String((Number(last.time.slice(0, 2)) + 6) % 24).padStart(2, '0')}:00` : '07:00';
+      list.push({ time: next, preset: '', image: '' });
+      saveSchedule(list);
+    } }, '+ ' + t('Add time')));
+  }
+  const scheduleBox = h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, t('Schedule')),
+    buildControl(toggle('scheduleEnabled', t('Change the look during the day'), { hint: t('E.g. foggy morning, steady rain in the afternoon, storm at night – with its own image.') })),
+    h('div', { class: 'row' }, scheduleList));
+  renderSchedule();
+
   /* ------------------------------------------------ custom: system extra */
   const updateInfo = h('div', { class: 'row-hint' });
   const updateBtn = h('button', { class: 'btn primary', style: 'display:none', onclick: () => api.installUpdate() }, t('Restart to update'));
@@ -476,10 +547,10 @@
     nav.append(item);
     const el = h('section', { class: 'section', 'data-id': sec.id }, h('h2', {}, sec.title), h('p', { class: 'lead' }, sec.lead));
     if (sec.custom === 'image') el.append(imageCard);
-    if (sec.custom === 'presets') el.append(presetBox);
+    if (sec.custom === 'presets') el.append(scheduleBox, presetBox);
     for (const g of sec.groups) el.append(h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, g.title), g.items.map(buildControl)));
     if (sec.custom === 'system') el.append(systemExtra);
-    if (sec.custom === 'weather') el.append(weatherBox);
+    if (sec.custom === 'weather') el.append(sleepBox, weatherBox);
     panel.append(el);
   }
   nav.append(h('div', { class: 'nav-spacer' }), h('div', { class: 'nav-foot' }, t('Double-click a slider to reset it')));
@@ -519,7 +590,7 @@
     if (status.attach && status.attach.mode === 'failed') { el.classList.add('error'); text = t('Desktop attach failed'); el.title = status.attach.error || ''; }
     else if (status.error) { el.classList.add('error'); text = t('Wallpaper error'); el.title = status.error; }
     else if (!status.enabled) text = t('Wallpaper off');
-    else if (status.suspended) { el.classList.add('suspended'); text = t('Sleeping · ') + t({ fullscreen: 'fullscreen app', battery: 'on battery', locked: 'locked', sleep: 'system sleep' }[status.reason] || 'paused'); }
+    else if (status.suspended) { el.classList.add('suspended'); text = t('Sleeping · ') + (String(status.reason).startsWith('app:') ? String(status.reason).slice(4) : t({ fullscreen: 'fullscreen app', battery: 'on battery', locked: 'locked', sleep: 'system sleep' }[status.reason] || 'paused')); }
     else if (paused) { el.classList.add('paused'); text = t('Paused'); }
     else { el.classList.add('live'); text = t('Live') + (status.fps ? ` · ${status.fps} FPS` : ''); }
     $('#statusText').textContent = text;
@@ -538,7 +609,7 @@
   /* -------------------------------------------------------------- events */
   api.onSettings((s) => applyRemote(s));
   api.onPause((p) => { paused = p; engine && engine.setPaused(p); renderPause(); renderStatus(); });
-  api.onStatus((s) => { status = s; renderStatus(); renderMonitors(); renderWeather(); renderUpdate(); });
+  api.onStatus((s) => { status = s; renderStatus(); renderMonitors(); renderWeather(); renderUpdate(); renderSleep(); });
   renderUpdate();
 
   // Mouse over the preview wipes the glass too.

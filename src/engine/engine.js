@@ -77,7 +77,7 @@
         this.audio.setOptions({
           enabled: !!this.settings.soundEnabled,
           volume: (this.settings.volume ?? 50) / 100,
-          intensity: (this.settings.rainIntensity ?? 50) / 100,
+          intensity: ((this.settings.rainIntensity ?? 50) / 100) * (this.settings.precipitation === 'snow' ? 0.25 : 1),
           soundscape: this.settings.soundscape,
           wind: !!this.settings.windEnabled,
           windVolume: (this.settings.windVolume ?? 40) / 100,
@@ -231,8 +231,9 @@
      * glass wipes condensation and tiny droplets like a finger.
      */
     pointer(x, y) {
-      if (this.settings.mouseInteraction === false) return;
       const cw = this.canvas.clientWidth || 1, ch = this.canvas.clientHeight || 1;
+      this.parallaxTarget = [x / cw - 0.5, y / ch - 0.5];
+      if (this.settings.mouseInteraction === false) return;
       const sx = (x / cw) * this.sim.width, sy = (y / ch) * this.sim.height;
       const last = this._pointer;
       this._pointer = { x: sx, y: sy, t: performance.now() };
@@ -240,6 +241,15 @@
       if (Math.hypot(sx - last.x, sy - last.y) < 0.5) return;
       this.sim.touch(last.x, last.y, sx, sy, 9);
       if (this.paused || !this.running) this.renderOnce();
+    }
+
+    /** Sleep timer: sound fades out during the last minute before `endsAt` (ms epoch). */
+    setSleep(endsAt) {
+      clearTimeout(this.sleepTimer);
+      if (!this.audio) return;
+      if (!endsAt) { this.audio.cancelFade(); return; }
+      const fade = Math.min(60, Math.max(1, (endsAt - Date.now()) / 1000));
+      this.sleepTimer = setTimeout(() => this.audio && this.audio.fadeOut(fade), Math.max(0, endsAt - Date.now() - fade * 1000));
     }
 
     /** Desktop hidden behind windows: stop drawing but keep the ambience playing. */
@@ -291,10 +301,22 @@
       return f;
     }
 
+    /** Per-frame values for the glass shader (cursor parallax). */
+    extras(dt = 0) {
+      const amt = (this.settings.parallax ?? 0) / 100;
+      const tgt = this.parallaxTarget || [0, 0];
+      const cur = this.parallaxCur || (this.parallaxCur = [0, 0]);
+      const k = dt > 0 ? Math.min(1, dt * 3) : 0;
+      cur[0] += (tgt[0] - cur[0]) * k;
+      cur[1] += (tgt[1] - cur[1]) * k;
+      // Content moves against the cursor → depth behind the glass.
+      return { parallax: [cur[0] * amt * 0.05, -cur[1] * amt * 0.05], pzoom: 1 + amt * 0.06 };
+    }
+
     renderOnce() {
       if (!this.renderer || this.renderer.lost) return;
       this.sim.render();
-      this.renderer.render(this.sim, this.time, this.flash());
+      this.renderer.render(this.sim, this.time, this.flash(), this.extras());
     }
 
     _loop(now) {
@@ -322,7 +344,7 @@
         }
       }
       this.sim.render();
-      this.renderer.render(this.sim, this.time, this.flash());
+      this.renderer.render(this.sim, this.time, this.flash(), this.extras(dt));
 
       this._frames++;
       if (now - this._fpsTime > 1000) {

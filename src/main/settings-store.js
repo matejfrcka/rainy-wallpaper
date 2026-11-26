@@ -40,7 +40,8 @@ class SettingsStore {
   /** Merge a partial update; returns { settings, changed: string[] }. */
   update(partial) {
     const next = sanitize({ ...this.settings, ...partial });
-    const changed = Object.keys(next).filter((k) => next[k] !== this.settings[k]);
+    const same = (a, b) => a === b || (typeof a === 'object' && a !== null && JSON.stringify(a) === JSON.stringify(b));
+    const changed = Object.keys(next).filter((k) => !same(next[k], this.settings[k]));
     this.settings = next;
     if (changed.length) this.scheduleSave();
     return { settings: this.get(), changed };
@@ -48,7 +49,7 @@ class SettingsStore {
 
   reset() {
     // Keep the chosen image and system options; reset the look.
-    const keep = ['backgroundPath', 'useSystemWallpaper', 'startWithWindows', 'wallpaperEnabled', 'pauseOnFullscreen', 'pauseOnBattery', 'pauseWhenCovered', 'mouseInteraction', 'weatherSync', 'weatherCity', 'weatherLat', 'weatherLon', 'autoDayNight', 'hotkeysEnabled', 'autoUpdate', 'language'];
+    const keep = ['backgroundPath', 'useSystemWallpaper', 'startWithWindows', 'wallpaperEnabled', 'pauseOnFullscreen', 'pauseOnBattery', 'pauseWhenCovered', 'mouseInteraction', 'weatherSync', 'weatherCity', 'weatherLat', 'weatherLon', 'autoDayNight', 'hotkeysEnabled', 'autoUpdate', 'language', 'screensaverEnabled', 'screensaverMinutes', 'screensaverClock', 'scheduleEnabled', 'schedule', 'pauseApps', 'parallax'];
     const next = { ...DEFAULT_SETTINGS };
     for (const k of keep) next[k] = this.settings[k];
     return this.update(next);

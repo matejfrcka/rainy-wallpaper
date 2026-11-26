@@ -98,6 +98,16 @@
     'Checking for updates…': 'Hľadám aktualizácie…', 'You have the latest version.': 'Máš najnovšiu verziu.', 'Downloading update': 'Sťahujem aktualizáciu',
     'Update ready': 'Aktualizácia pripravená', 'Update failed': 'Aktualizácia zlyhala',
     'Microsoft Store version: turn on "Rainy Glass" in Task Manager → Startup apps.': 'Verzia z Microsoft Store: zapni „Rainy Glass“ v Správcovi úloh → Aplikácie pri spustení.',
+    'Depth parallax': 'Hĺbková paralaxa', 'The background moves slightly with the cursor, like looking through a real window.': 'Pozadie sa jemne posúva s kurzorom, ako keď pozeráš cez skutočné okno.',
+    'Weather': 'Počasie', 'Snow': 'Sneh', 'Frost': 'Námraza', 'Ice crystals grow from the window frame. Wipe them with the mouse.': 'Ľadové kryštály rastú od rámu okna. Zotrieš ich myšou.',
+    'Pause for these apps': 'Pozastaviť pre tieto aplikácie', 'Comma separated program names. The wallpaper pauses while one of them is in front.': 'Názvy programov oddelené čiarkou. Tapeta sa pozastaví, keď je niektorý z nich v popredí.',
+    'Screensaver': 'Šetrič obrazovky', 'Rain screensaver': 'Dažďový šetrič obrazovky', 'Start after': 'Spustiť po', 'Show clock': 'Zobraziť hodiny', 'Try screensaver': 'Vyskúšať šetrič',
+    'Sleep timer': 'Časovač spánku', 'Turn off sound after': 'Vypnúť zvuk po', 'Off': 'Vyp', 'Sound fades out in': 'Zvuk stíchne o',
+    'The rain sound slowly fades out and turns off.': 'Zvuk dažďa postupne stíchne a vypne sa.',
+    'Schedule': 'Plánovač', 'Change the look during the day': 'Meniť vzhľad počas dňa',
+    'E.g. foggy morning, steady rain in the afternoon, storm at night – with its own image.': 'Napr. hmlisté ráno, popoludní dážď, v noci búrka – aj s vlastným obrázkom.',
+    'Keep current look': 'Ponechať aktuálny vzhľad', 'Keep current image': 'Ponechať aktuálny obrázok', 'Image': 'Obrázok', 'Add time': 'Pridať čas',
+    'After the Storm': 'Po búrke', 'Snowy Window': 'Zasnežené okno', 'Frosty Morning': 'Mrazivé ráno',
     'Open Settings': 'Otvoriť nastavenia', 'Change background…': 'Zmeniť pozadie…', 'Quit': 'Ukončiť',
   };
 

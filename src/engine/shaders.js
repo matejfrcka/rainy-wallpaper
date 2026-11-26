@@ -89,6 +89,11 @@
   uniform float uRainAmt;
   uniform float uFlash;
   uniform float uDayNight;     // -1 night .. 0 neutral .. 1 day
+  uniform sampler2D uSnow;     // snow stuck on the glass (coverage in r)
+  uniform float uSnowMode;     // 1 = snow falls outside instead of rain
+  uniform float uFrost;        // ice crystals on the glass
+  uniform vec2 uParallax;      // background offset (cursor parallax)
+  uniform float uPZoom;        // background over-scan for parallax
 
   float hash(vec2 p) {
     p = fract(p * vec2(123.34, 456.21));
@@ -123,14 +128,40 @@
     return line * seg * (0.5 + 0.5 * h / density);
   }
 
+  // Snow falling outside: soft drifting flakes.
+  float snowLayer(vec2 uv, float scale, float speed, float seed) {
+    float aspect = uRes.x / uRes.y;
+    vec2 p = vec2(uv.x * aspect, uv.y) * scale;
+    p.y += uTime * speed;
+    p.x += sin(uTime * 0.6 + p.y * 0.35 + seed) * 0.35;
+    vec2 id = floor(p), f = fract(p);
+    float h = hash(id + seed);
+    vec2 c = vec2(0.2 + 0.6 * hash(id * 1.3 + seed), 0.2 + 0.6 * hash(id * 2.7 + seed));
+    float r = 0.06 + 0.1 * h;
+    return smoothstep(r, r * 0.25, length(f - c)) * step(0.35, h);
+  }
+
+  // Ridged fbm → branching ice-crystal veins.
+  float frostPattern(vec2 p) {
+    float n = 0.0, a = 0.55;
+    for (int i = 0; i < 5; i++) {
+      n += a * (1.0 - abs(noise(p) * 2.0 - 1.0));
+      p = p * 2.07 + vec2(1.7, 9.2);
+      a *= 0.5;
+    }
+    return n;
+  }
+
   void main() {
     vec2 uv = vUv;
+    // Background coordinates: over-scanned and shifted for cursor parallax.
+    vec2 suv = (uv - 0.5) / uPZoom + 0.5 + uParallax;
     vec2 aspect = vec2(uRes.y / uRes.x, 1.0);
 
     // ---- glass surface imperfections --------------------------------------
     vec2 wave = vec2(noise(uv * vec2(4.0, 9.0) + 3.1), noise(uv * vec2(5.0, 8.0) - 7.3)) - 0.5;
     wave += 0.5 * (vec2(noise(uv * 23.0 + 1.0), noise(uv * 21.0 - 4.0)) - 0.5);
-    vec2 guv = uv + wave * uDistortion * 0.006;
+    vec2 guv = suv + wave * uDistortion * 0.006;
 
     // ---- water map ---------------------------------------------------------
     vec4 w = texture(uWater, uv);
@@ -153,8 +184,29 @@
     float opacity = 1.0 - uTransparency;
     glass = mix(glass, gBlur * 0.8 + vec3(0.06, 0.07, 0.08), opacity * 0.7);
 
+    // Ice crystals grow from the window edges; wiped by water and the mouse.
+    float frostMask = 0.0;
+    if (uFrost > 0.0) {
+      vec2 e = min(uv, 1.0 - uv);
+      float edge = 1.0 - clamp(min(e.x * uRes.x / uRes.y, e.y) * 2.6, 0.0, 1.0);
+      vec2 fp = uv * vec2(uRes.x / uRes.y, 1.0);
+      float pat = frostPattern(fp * 11.0) * 0.7 + frostPattern(fp * 3.0 + 4.0) * 0.45;
+      float grow = edge * 1.1 + uFrost * 0.55 - 0.35;           // ice grows inward from the frame
+      frostMask = smoothstep(0.62, 0.95, pat * grow + uFrost * 0.25);
+      frostMask = max(frostMask, smoothstep(0.85, 1.0, edge) * uFrost * 0.9);
+      frostMask *= 1.0 - cleared * 0.9;
+      vec3 ice = gBlur * 0.45 + vec3(0.74, 0.84, 0.95) * (0.32 + luma(gBlur) * 0.45);
+      ice *= 0.8 + smoothstep(0.9, 1.3, frostPattern(fp * 26.0)) * 0.45;   // crystalline veins
+      glass = mix(glass, ice, frostMask * 0.85);
+    }
+
+    // Snow falling outside the window.
+    if (uSnowMode > 0.5 && uStreaks > 0.0) {
+      float sn = snowLayer(uv, 9.0, 0.35, 1.0) * 0.5 + snowLayer(uv, 16.0, 0.55, 5.0) * 0.7 + snowLayer(uv, 28.0, 0.8, 9.0) * 0.5;
+      glass += sn * uStreaks * (0.25 + luma(gBlur) * 0.4) * (1.0 - fog * 0.5);
+    }
     // Rain streaks outside the window.
-    if (uStreaks > 0.0) {
+    else if (uStreaks > 0.0) {
       float s = streakLayer(uv, 38.0, 2.6, 0.10 + uRainAmt * 0.25, 1.0) * 0.6
               + streakLayer(uv, 70.0, 3.4, 0.08 + uRainAmt * 0.2, 7.0) * 0.4
               + streakLayer(uv, 120.0, 4.4, 0.06 + uRainAmt * 0.18, 13.0) * 0.25;
@@ -169,11 +221,11 @@
       vec2 off = -n * (0.015 + 0.11 * uRefraction) * (0.35 + thick * 0.9) * aspect;
       off += wave * uDistortion * 0.01;
       float ca = uChromatic * 0.18;
-      vec2 base = uv + off;
+      vec2 base = suv + off;
       vec3 sharp = vec3(
-        texture(uScene, uv + off * (1.0 + ca)).r,
+        texture(uScene, suv + off * (1.0 + ca)).r,
         texture(uScene, base).g,
-        texture(uScene, uv + off * (1.0 - ca)).b);
+        texture(uScene, suv + off * (1.0 - ca)).b);
       vec3 blurred = texture(uBlur, base).rgb;
       // Larger (thicker) drops defocus the background more.
       float db = uBlurAmt * smoothstep(0.35, 1.0, thick) * 0.85;
@@ -198,6 +250,16 @@
     }
 
     vec3 col = mix(glass, drop, cov);
+
+    // Snow stuck on the glass (on top of everything, granular and slightly lit).
+    float sc = texture(uSnow, uv).r;
+    if (sc > 0.002) {
+      float grain = 0.7 + 0.6 * noise(uv * uRes / 3.0);
+      float cover = smoothstep(0.05, 0.55, sc * grain);
+      vec3 snowCol = vec3(0.92, 0.95, 1.0) * (0.55 + luma(gBlur) * 0.55);
+      snowCol += step(0.985, hash(floor(uv * uRes / 2.0))) * 0.25 * uReflection;   // sparkles
+      col = mix(col, snowCol, cover * 0.92);
+    }
 
     // ---- glass reflections -----------------------------------------------
     float sheen = smoothstep(0.0, 1.0, 1.0 - uv.y) * 0.03

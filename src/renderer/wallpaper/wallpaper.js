@@ -47,6 +47,8 @@
   api.onSuspend((s) => engine.setSuspended(s));
   api.onHidden((h) => engine.setHidden(h));
   api.onPointer((x, y) => engine.pointer(x, y));
+  api.onSleep((endsAt) => engine.setSleep(endsAt));
+  api.getSleep().then((endsAt) => engine.setSleep(endsAt));
   api.onReset(() => engine.reset());
   api.onLightning((d) => engine.lightning(d, false));
 

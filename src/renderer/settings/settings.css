@@ -321,3 +321,13 @@ input[type=text]:focus { border-color: var(--accent); }
 .preset-save { flex-wrap: wrap; }
 .row-head > div:first-child { flex: 1 1 170px; min-width: 0; }
 .preset-save input[type=text] { min-width: 140px; }
+
+/* ---------- schedule ---------- */
+.schedule-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.time-input, .select {
+  padding: 5px 8px; border-radius: 8px; border: 1px solid var(--border-strong);
+  background: rgba(0,0,0,0.25); color: var(--text); font: inherit; font-size: 12px; outline: none;
+}
+.select { flex: 1; min-width: 0; }
+.select option { background: #161a21; }
+.time-input::-webkit-calendar-picker-indicator { filter: invert(0.8); }

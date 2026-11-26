@@ -26,6 +26,12 @@ The app has two separate layers:
 - **Automatic day/night**: the color grading follows the sun's elevation at your location.
 - **Soundscapes**: window, tin roof, leaves or car, plus optional wind.
 - **Preset gallery**: every preset shows a preview rendered over your own background. Presets can be exported and imported as `.json` files.
+- **Snow and frost**: snowflakes stick to the glass and melt, snow falls outside, and ice crystals grow from the window frame (wipe them with the mouse). Extra presets: *After the Storm*, *Snowy Window* and *Frosty Morning*. With live weather on, snow and frost follow the forecast.
+- **Depth parallax**: the background moves slightly with the cursor, as if you were looking through a real window.
+- **Rain screensaver**: starts after N idle minutes on every monitor, with an optional clock, and closes on any input. It never starts over games, videos or presentations.
+- **Sleep timer**: the rain sound fades out after 15, 30, 60 or 90 minutes (set it in *Atmosphere* or from the tray).
+- **Schedule**: a different preset and image for each time of day, for example a foggy morning and a storm at night.
+- **Pause rules for apps**: the wallpaper pauses while a listed program (for example `photoshop.exe`) is in front.
 - **Languages**: English and Slovak (automatic from the system or chosen in *System*).
 - **Global shortcuts**: Ctrl+Alt+R pauses or resumes the rain, Ctrl+Alt+W turns the wallpaper on or off, Ctrl+Alt+S opens the settings.
 - **Automatic updates** from GitHub Releases (installed version). **Live performance** stats (FPS, CPU, RAM, GPU) are shown in *System* and written to the log.

@@ -28,6 +28,8 @@
     trailLength: 50,
     merging: true,
     randomGeneration: true,
+    precipitation: 'rain',     // 'rain' | 'snow'
+    frost: 0,                  // ice crystals on the glass (0 = off)
 
     // Glass
     refraction: 60,
@@ -53,6 +55,7 @@
     windVolume: 40,
 
     // Interaction & weather
+    parallax: 25,              // background follows the cursor (depth behind the glass)
     mouseInteraction: true,    // cursor over the desktop wipes condensation
     weatherSync: false,        // drive rain/thunder from the real weather
     weatherCity: '',
@@ -67,6 +70,12 @@
     pauseOnBattery: false,
     startWithWindows: false,
     wallpaperEnabled: true,
+    screensaverEnabled: false, // rain screensaver after inactivity
+    screensaverMinutes: 10,
+    screensaverClock: true,
+    scheduleEnabled: false,    // time-of-day schedule (see `schedule`)
+    schedule: [],              // [{ time: 'HH:MM', preset: name|'', image: path|'' }]
+    pauseApps: '',             // comma separated exe names that pause the wallpaper when in front
     hotkeysEnabled: true,      // Ctrl+Alt+R pause, Ctrl+Alt+W wallpaper on/off
     autoUpdate: true,
     language: 'auto',          // 'auto' | 'en' | 'sk'
@@ -80,17 +89,27 @@
     glassTransparency: [0, 100], reflection: [0, 100], condensation: [0, 100], blur: [0, 100],
     streaks: [0, 100], volume: [0, 100], dayNight: [0, 100], fpsLimit: [0, 240], renderScale: [50, 100],
     windVolume: [0, 100], weatherLat: [-90, 90], weatherLon: [-180, 180],
+    frost: [0, 100], parallax: [0, 100], screensaverMinutes: [1, 120],
   };
 
-  const ENUMS = { fitMode: ['fill', 'fit', 'stretch'], soundscape: ['window', 'roof', 'leaves', 'car'], language: ['auto', 'en', 'sk'] };
-  const STRINGS = { weatherCity: 80 };
+  const ENUMS = { fitMode: ['fill', 'fit', 'stretch'], soundscape: ['window', 'roof', 'leaves', 'car'], precipitation: ['rain', 'snow'], language: ['auto', 'en', 'sk'] };
+  const STRINGS = { weatherCity: 80, pauseApps: 600 };
+
+  function sanitizeSchedule(list) {
+    if (!Array.isArray(list)) return [];
+    return list.slice(0, 12).map((e) => ({
+      time: /^([01]\d|2[0-3]):[0-5]\d$/.test(e && e.time) ? e.time : '08:00',
+      preset: typeof (e && e.preset) === 'string' ? e.preset.slice(0, 48) : '',
+      image: typeof (e && e.image) === 'string' ? e.image.slice(0, 1024) : '',
+    }));
+  }
 
   // Keys that describe the "look" (presets store only these, never the image or system options).
   const PRESET_KEYS = [
     'rainIntensity', 'dropletDensity', 'dropletSize', 'dropletSpeed', 'trailLength', 'merging',
     'randomGeneration', 'refraction', 'distortion', 'chromatic', 'glassTransparency', 'reflection',
     'condensationEnabled', 'condensation', 'blur', 'streaksEnabled', 'streaks', 'soundEnabled', 'volume',
-    'thunderEnabled', 'lightning', 'dayNight', 'bgBrightness', 'bgBlur', 'soundscape', 'windEnabled', 'windVolume',
+    'thunderEnabled', 'lightning', 'dayNight', 'bgBrightness', 'bgBlur', 'soundscape', 'windEnabled', 'windVolume', 'precipitation', 'frost',
   ];
 
   const BUILTIN_PRESETS = [
@@ -98,6 +117,9 @@
     { name: 'Steady Rain', builtin: true, values: { rainIntensity: 55, dropletDensity: 60, dropletSize: 50, dropletSpeed: 50, trailLength: 50, condensation: 35, streaks: 35, thunderEnabled: false, dayNight: 50 } },
     { name: 'Thunderstorm', builtin: true, values: { rainIntensity: 95, dropletDensity: 80, dropletSize: 70, dropletSpeed: 80, trailLength: 75, condensation: 30, streaks: 80, thunderEnabled: true, lightning: true, soundEnabled: true, dayNight: 30, bgBrightness: 85 } },
     { name: 'Foggy Morning', builtin: true, values: { rainIntensity: 20, dropletDensity: 85, dropletSize: 40, dropletSpeed: 30, trailLength: 60, condensationEnabled: true, condensation: 80, glassTransparency: 70, streaks: 5, dayNight: 62 } },
+    { name: 'After the Storm', builtin: true, values: { rainIntensity: 3, dropletDensity: 90, dropletSize: 60, dropletSpeed: 35, trailLength: 70, randomGeneration: true, condensation: 45, streaks: 0, thunderEnabled: false, dayNight: 58, bgBrightness: 105 } },
+    { name: 'Snowy Window', builtin: true, values: { precipitation: 'snow', rainIntensity: 45, dropletDensity: 40, dropletSize: 45, dropletSpeed: 25, trailLength: 40, condensation: 40, frost: 25, streaks: 60, dayNight: 45, windEnabled: true } },
+    { name: 'Frosty Morning', builtin: true, values: { precipitation: 'snow', rainIntensity: 10, dropletDensity: 30, dropletSize: 35, dropletSpeed: 20, condensation: 55, frost: 75, streaks: 15, dayNight: 62 } },
     { name: 'Night Window', builtin: true, values: { rainIntensity: 60, dropletDensity: 65, dropletSize: 55, dropletSpeed: 50, trailLength: 55, condensation: 40, reflection: 65, streaks: 40, dayNight: 12, bgBrightness: 80 } },
   ];
 
@@ -116,6 +138,7 @@
       const def = DEFAULT_SETTINGS[key];
       const val = input[key];
       if (key === 'backgroundPath') out[key] = typeof val === 'string' && val.length ? val : null;
+      else if (key === 'schedule') out[key] = sanitizeSchedule(val);
       else if (ENUMS[key]) out[key] = ENUMS[key].includes(val) ? val : def;
       else if (STRINGS[key]) out[key] = typeof val === 'string' ? val.slice(0, STRINGS[key]) : def;
       else if (typeof def === 'boolean') out[key] = Boolean(val);

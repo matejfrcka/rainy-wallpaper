@@ -15,6 +15,7 @@ const { buildWallpaperEngineProject } = require('./we-export');
 const weather = require('./weather');
 const i18n = require('../shared/i18n');
 const updater = require('./updater');
+const { Screensaver } = require('./screensaver');
 const t = (x) => i18n.t(x);
 const win32 = require('./win32');
 
@@ -40,7 +41,7 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(init);
 }
 
-let store, wallpapers, monitor, tray, settingsWin, logFile;
+let store, wallpapers, monitor, tray, settingsWin, logFile, screensaver;
 let currentImage = { key: 'none', source: null, path: null, name: null };
 const status = { suspended: false, reason: null, paused: false, fps: 0, error: null };
 
@@ -110,7 +111,76 @@ function refreshImage(force = false) {
 }
 
 function fullStatus() {
-  return { ...status, paused: wallpapers.paused, displays: wallpapers.displays(), enabled: wallpapers.enabled, attach: wallpapers.attach, metrics, weather: weatherState, update: { ...updater.state } };
+  return { ...status, paused: wallpapers.paused, displays: wallpapers.displays(), enabled: wallpapers.enabled, attach: wallpapers.attach, metrics, weather: weatherState, update: { ...updater.state }, sleep: sleep ? { endsAt: sleep.endsAt, minutes: sleep.minutes } : null };
+}
+
+/* ----------------------------------------------------------- sleep timer */
+
+let sleep = null; // { endsAt, timer }
+
+function setSleepTimer(minutes) {
+  if (sleep) clearTimeout(sleep.timer);
+  sleep = null;
+  minutes = Number(minutes) || 0;
+  if (minutes > 0) {
+    const endsAt = Date.now() + minutes * 60 * 1000;
+    sleep = {
+      endsAt, minutes,
+      timer: setTimeout(() => {
+        log('sleep timer: sound off');
+        sleep = null;
+        applySettings({ soundEnabled: false });
+        wallpapers.broadcast('audio:sleep', null);
+        pushStatus();
+      }, minutes * 60 * 1000),
+    };
+    if (!store.get().soundEnabled) applySettings({ soundEnabled: true });
+    log(`sleep timer: ${minutes} min`);
+  }
+  wallpapers.broadcast('audio:sleep', sleep ? sleep.endsAt : null);
+  pushStatus();
+}
+
+/* ------------------------------------------------------------- scheduler */
+
+let scheduleKey = null;
+
+/** Apply a preset by name (shared by IPC, tray and the scheduler). */
+function applyPresetByName(name) {
+  const { changed } = store.applyPreset(name);
+  const settings = withImage(store.get());
+  wallpapers.broadcast('settings:changed', settings, changed);
+  sendToSettings('settings:changed', settings, changed);
+  return settings;
+}
+
+/** Time-of-day schedule: the entry whose time passed most recently is active. */
+function runSchedule(force = false) {
+  const s = store.get();
+  if (!s.scheduleEnabled || !s.schedule.length) { scheduleKey = null; return; }
+  const now = new Date();
+  const mins = now.getHours() * 60 + now.getMinutes();
+  const toMin = (t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const sorted = [...s.schedule].sort((a, b) => toMin(a.time) - toMin(b.time));
+  const active = [...sorted].reverse().find((e) => toMin(e.time) <= mins) || sorted[sorted.length - 1];
+  const key = JSON.stringify(active);
+  if (!force && key === scheduleKey) return;
+  scheduleKey = key;
+  log(`schedule: ${active.time} preset="${active.preset}" image="${active.image}"`);
+  try {
+    if (active.preset) applyPresetByName(active.preset);
+    if (active.image) {
+      images.validate(active.image);
+      applySettings({ backgroundPath: active.image });
+    }
+  } catch (e) {
+    log('schedule error: ' + e.message);
+  }
+}
+
+function startScheduler() {
+  runSchedule(true);
+  setInterval(() => runSchedule(), 30 * 1000);
 }
 
 /* --------------------------------------------------------------- hotkeys */
@@ -137,7 +207,7 @@ function startPointer() {
   let last = '';
   setInterval(() => {
     const s = store.get();
-    if (!s.mouseInteraction || !wallpapers.enabled || status.suspended || !wallpapers.windows.size) return;
+    if (!(s.mouseInteraction || s.parallax > 0) || !wallpapers.enabled || status.suspended || !wallpapers.windows.size) return;
     let phys;
     if (process.platform === 'win32') phys = win32.getDesktopCursor(wallpapers.ownHandles());
     else phys = screen.getCursorScreenPoint();
@@ -240,6 +310,10 @@ function init() {
     },
     onCovered: (rects) => { wallpapers.setCovered(rects); pushStatus(); },
   });
+  screensaver = new Screensaver({ preload: PRELOAD, getSettings: () => store.get(), log });
+  screensaver.start();
+  monitor.isScreensaver = () => screensaver.active;
+  startScheduler();
   startMetrics();
   registerHotkeys();
   updater.init({ log, getSettings: () => store.get(), onState: () => { pushStatus(); updateTrayMenu(); } });
@@ -340,6 +414,9 @@ function updateTrayMenu() {
     { label: wallpapers.paused ? t('Resume rain') : t('Pause rain'), click: () => setPaused(!wallpapers.paused) },
     { label: t('Change background…'), click: () => selectImage() },
     { label: t('Rain sound'), type: 'checkbox', checked: s.soundEnabled, click: (i) => applySettings({ soundEnabled: i.checked }) },
+    { label: t('Sleep timer'), submenu: [0, 15, 30, 60, 90].map((m) => ({
+      label: m ? `${m} min` : t('Off'), type: 'radio', checked: m ? !!sleep && sleep.minutes === m : !sleep, click: () => { setSleepTimer(m); updateTrayMenu(); },
+    })) },
     { type: 'separator' },
     { label: t('Start with Windows'), type: 'checkbox', checked: s.startWithWindows, click: (i) => applySettings({ startWithWindows: i.checked }) },
     updater.state.status === 'ready'
@@ -370,6 +447,7 @@ function applySettings(partial, origin) {
   const settings = withImage(raw);
   if (!changed.length) return settings;
   wallpapers.broadcast('settings:changed', settings, changed);
+  if (screensaver) screensaver.broadcast('settings:changed', settings, changed);
   // The settings window needs the echo when the effective image changed.
   if (!origin || origin !== (settingsWin && settingsWin.webContents) || prevKey !== currentImage.key) sendToSettings('settings:changed', settings, changed);
   if (changed.includes('startWithWindows')) applyLoginItem(settings.startWithWindows);
@@ -386,6 +464,7 @@ function applySettings(partial, origin) {
     if (settingsWin && !settingsWin.isDestroyed()) setTimeout(() => settingsWin.reload(), 150);
   }
   if (changed.includes('hotkeysEnabled')) registerHotkeys();
+  if (changed.includes('schedule') || changed.includes('scheduleEnabled')) runSchedule(true);
   if (changed.includes('autoDayNight') && settings.autoDayNight) updateDayNight();
   if (changed.some((k) => ['soundEnabled', 'wallpaperEnabled', 'startWithWindows'].includes(k))) updateTrayMenu();
   return settings;
@@ -456,6 +535,7 @@ function registerIpc() {
     const { changed } = store.applyPreset(name);
     const settings = withImage(store.get());
     wallpapers.broadcast('settings:changed', settings, changed);
+    screensaver.broadcast('settings:changed', settings, changed);
     return settings;
   });
 
@@ -505,6 +585,14 @@ function registerIpc() {
       presets = store.savePreset(name, data.values, true);
     }
     return presets;
+  });
+
+  ipcMain.handle('sleep:get', () => (sleep ? sleep.endsAt : null));
+  ipcMain.handle('sleep:set', (_e, minutes) => setSleepTimer(minutes));
+  ipcMain.on('screensaver:exit', () => screensaver.stop());
+  ipcMain.handle('screensaver:test', () => { if (settingsWin) settingsWin.minimize(); setTimeout(() => screensaver.show(), 400); });
+  ipcMain.handle('schedule:pick-image', async () => {
+    try { return await images.pickImage(settingsWin); } catch (e) { dialog.showErrorBox('Unable to use this image', e.message); return null; }
   });
 
   ipcMain.handle('log:open', () => shell.showItemInFolder(logFile));

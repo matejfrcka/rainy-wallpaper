@@ -163,6 +163,7 @@
       const W = sim.width, H = sim.height, res = [W, H];
       const drp = r.target('droplets', W, H);
       const fog = r.target('fog', Math.ceil(W / 4), Math.ceil(H / 4));
+      const snow = r.target('snow', Math.ceil(W / 2), Math.ceil(H / 2));
       const key = W + 'x' + H;
       const c = sim.cmd;
       if (c.reset || key !== this.sizeKey) {
@@ -170,6 +171,7 @@
         gl.clearColor(0, 0, 0, 0);
         this.bindTarget(drp); gl.clear(gl.COLOR_BUFFER_BIT);
         this.bindTarget(fog); gl.clear(gl.COLOR_BUFFER_BIT);
+        this.bindTarget(snow); gl.clear(gl.COLOR_BUFFER_BIT);
       }
 
       const { p, u } = this.prog;
@@ -198,6 +200,16 @@
       this.instances(this.buf, this.packDiscs(c.fog, 4), 1, [1, 1, 1, 1], res);
       if (c.fogFade > 0) this.instances(this.buf, this.full(W, H), 2, [0, 0, 0, c.fogFade], res);
 
+      // Snow stuck on the glass: flakes accumulate, water and the mouse wipe them, they melt.
+      if (c.snow.length || c.wipe.length || c.snowFade > 0) {
+        this.bindTarget(snow);
+        NORMAL();
+        this.instances(this.buf, this.packDiscs(c.snow, 4), 1, [1, 1, 1, 1], res);
+        ERASE();
+        this.instances(this.buf, this.packDiscs(c.wipe, 3), 1, null, res);
+        if (c.snowFade > 0) this.instances(this.buf, this.full(W, H), 2, [0, 0, 0, c.snowFade], res);
+      }
+
       // Water map = droplets + drops.
       gl.disable(gl.BLEND);
       const water = r.target('water', W, H);
@@ -215,7 +227,7 @@
       }
       gl.disable(gl.BLEND);
       sim.consumed();
-      return { water, fog };
+      return { water, fog, snow };
     }
   }
 
@@ -424,7 +436,7 @@
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
     }
 
-    render(sim, time, flash) {
+    render(sim, time, flash, extras) {
       if (this.lost) return;
       const gl = this.gl;
       if (this.sceneDirty) this.updateScene();
@@ -443,6 +455,12 @@
       bind(1, this.blurTarget.tex, 'uBlur');
       bind(2, wl.water.tex, 'uWater');
       bind(3, wl.fog.tex, 'uFog');
+      bind(4, wl.snow.tex, 'uSnow');
+      const ex = extras || {};
+      gl.uniform2f(u.uParallax, (ex.parallax || [0, 0])[0], (ex.parallax || [0, 0])[1]);
+      gl.uniform1f(u.uPZoom, ex.pzoom || 1);
+      gl.uniform1f(u.uSnowMode, s.precipitation === 'snow' ? 1 : 0);
+
       const f = (k, d) => ((s[k] ?? d) / 100);
       gl.uniform2f(u.uRes, this.canvas.width, this.canvas.height);
       gl.uniform1f(u.uTime, time);
@@ -457,6 +475,7 @@
       gl.uniform1f(u.uRainAmt, f('rainIntensity', 55));
       gl.uniform1f(u.uFlash, flash || 0);
       gl.uniform1f(u.uDayNight, (f('dayNight', 50) - 0.5) * 2);
+      gl.uniform1f(u.uFrost, f('frost', 0));
       this.draw(this.progGlass, null);
     }
 

@@ -119,7 +119,7 @@
       const t = this.ctx.currentTime;
       const i = this.intensity;
       const on = this.enabled && !this.suspended;
-      this.master.gain.setTargetAtTime(on ? this.volume * 0.9 : 0, t, ramp);
+      if (!this.fading) this.master.gain.setTargetAtTime(on ? this.volume * 0.9 : 0, t, ramp);
       const P = this.profile, g = P.gain;
       this.hiss.gain.gain.setTargetAtTime((0.12 + i * 0.45) * g[0], t, ramp);
       this.body.gain.gain.setTargetAtTime((0.05 + i * i * 0.6) * g[1], t, ramp);
@@ -211,6 +211,23 @@
         if (this.ctx && this.ctx.state === 'suspended' && !this.suspended) this.ctx.resume().catch(() => {});
       }
       this.applyLevels();
+    }
+
+    /** Sleep timer: fade the whole ambience to silence over `seconds`. */
+    fadeOut(seconds) {
+      if (!this.ctx) return;
+      this.fading = true;
+      const g = this.master.gain, t = this.ctx.currentTime;
+      g.cancelScheduledValues(t);
+      g.setValueAtTime(g.value, t);
+      g.linearRampToValueAtTime(0.0001, t + seconds);
+    }
+
+    cancelFade() {
+      if (!this.fading) return;
+      this.fading = false;
+      if (this.ctx) this.master.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.applyLevels(1.5);
     }
 
     setSuspended(s) {
