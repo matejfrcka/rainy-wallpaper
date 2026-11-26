@@ -41,7 +41,7 @@
   "Sync rain and snow with real weather": "Déšť a sníh podle skutečného počasí",
   "Rain, snow and thunder follow the real weather at your location (Open-Meteo).": "Déšť, sníh a bouřky se řídí skutečným počasím ve tvé lokalitě (Open-Meteo).",
   "See-through Start menu": "Průhledná nabídka Start",
-  "Turns on Windows' transparency effects so Start, the taskbar and its flyouts use blurred glass. Your setting is restored when you switch this off or close the app.": "Zapne efekty průhlednosti Windows, takže Start, hlavní panel a jeho okna budou z rozmazaného skla. Po vypnutí nebo zavření aplikace se vrátí tvé nastavení.",
+  "Turns on Windows' transparency effects and removes the accent colour tint, so Start, the taskbar and its flyouts use the clearest glass Windows offers. Your settings are restored when you switch this off or close the app.": "Zapne efekty průhlednosti Windows a vypne barevný nádech zvýrazňující barvy, takže Start, hlavní panel a jejich okna budou z nejprůhlednějšího skla, jaké Windows nabízí. Po vypnutí nebo zavření aplikace se vrátí tvé nastavení.",
   "Folder window opacity": "Průhlednost oken složek",
   "Makes File Explorer windows see-through so the rain shows behind them. 100 % = normal.": "Okna Průzkumníka budou průsvitná a za nimi bude vidět déšť. 100 % = normální.",
   "Live weather": "Počasí živě",

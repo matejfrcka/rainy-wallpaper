@@ -306,13 +306,21 @@ function syncStartTransparency(quitting = false) {
   const s = store.get();
   const want = s.startTransparent && !quitting;
   if (want && s.startSavedTransparency < 0) {
+    // Transparency effects on + no accent colour tint on Start/taskbar: the
+    // neutral glass Windows then draws is the most see-through it offers.
     const cur = regQuery('EnableTransparency');
-    store.update({ startSavedTransparency: cur < 0 ? 0 : cur });
-    if (cur !== 1) { regSet('EnableTransparency', 1); win32.restoreTaskbar(); }
+    const prev = regQuery('ColorPrevalence');
+    store.update({ startSavedTransparency: cur < 0 ? 0 : cur, startSavedPrevalence: prev < 0 ? 0 : prev });
+    if (cur !== 1) regSet('EnableTransparency', 1);
+    if (prev > 0) regSet('ColorPrevalence', 0);
+    if (cur !== 1 || prev > 0) win32.restoreTaskbar();
     log('start menu: transparency on');
   } else if (!want && s.startSavedTransparency >= 0) {
-    if (s.startSavedTransparency !== 1) { regSet('EnableTransparency', s.startSavedTransparency); win32.restoreTaskbar(); }
-    store.update({ startSavedTransparency: -1 });
+    let touched = false;
+    if (s.startSavedTransparency !== 1) { regSet('EnableTransparency', s.startSavedTransparency); touched = true; }
+    if (s.startSavedPrevalence > 0) { regSet('ColorPrevalence', s.startSavedPrevalence); touched = true; }
+    if (touched) win32.restoreTaskbar();
+    store.update({ startSavedTransparency: -1, startSavedPrevalence: -1 });
     log('start menu: transparency restored');
   }
 }

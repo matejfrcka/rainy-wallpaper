@@ -41,7 +41,7 @@
   "Sync rain and snow with real weather": "Sincronizza pioggia e neve con il meteo reale",
   "Rain, snow and thunder follow the real weather at your location (Open-Meteo).": "Pioggia, neve e temporali seguono il meteo reale della tua zona (Open-Meteo).",
   "See-through Start menu": "Menu Start trasparente",
-  "Turns on Windows' transparency effects so Start, the taskbar and its flyouts use blurred glass. Your setting is restored when you switch this off or close the app.": "Attiva gli effetti di trasparenza di Windows: Start, la barra delle applicazioni e i suoi menu diventano vetro sfocato. La tua impostazione torna com’era quando lo disattivi o chiudi l’app.",
+  "Turns on Windows' transparency effects and removes the accent colour tint, so Start, the taskbar and its flyouts use the clearest glass Windows offers. Your settings are restored when you switch this off or close the app.": "Attiva gli effetti di trasparenza e rimuove la tinta del colore principale, così Start, la barra delle applicazioni e i suoi menu usano il vetro più chiaro offerto da Windows. Le tue impostazioni tornano com’erano quando lo disattivi o chiudi l’app.",
   "Folder window opacity": "Opacità delle finestre delle cartelle",
   "Makes File Explorer windows see-through so the rain shows behind them. 100 % = normal.": "Rende trasparenti le finestre di Esplora file per vedere la pioggia dietro. 100 % = normale.",
   "Live weather": "Meteo in tempo reale",

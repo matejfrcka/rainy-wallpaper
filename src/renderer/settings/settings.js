@@ -168,7 +168,7 @@
           seg('taskbarStyle', t('Taskbar'), [['default', t('Default')], ['clear', t('Clear')], ['blur', t('Blur')], ['acrylic', t('Frosted')]], { hint: t('Makes the taskbar see-through so the rain keeps running underneath it. Works best on Windows 10 and Windows 11 21H2; newer Windows 11 builds may partly ignore it.') }),
           toggle('taskbarLightIcons', t('White clock and icons on the taskbar'), { dependsOn: (st) => st.taskbarStyle !== 'default', hint: t('Switches Windows to dark mode while the see-through taskbar is on and restores your setting afterwards.') }),
           slider('explorerOpacity', t('Folder window opacity'), { min: 40, max: 100, unit: ' %', hint: t('Makes File Explorer windows see-through so the rain shows behind them. 100 % = normal.') }),
-          toggle('startTransparent', t('See-through Start menu'), { hint: t('Turns on Windows\' transparency effects so Start, the taskbar and its flyouts use blurred glass. Your setting is restored when you switch this off or close the app.') }),
+          toggle('startTransparent', t('See-through Start menu'), { hint: t('Turns on Windows\' transparency effects and removes the accent colour tint, so Start, the taskbar and its flyouts use the clearest glass Windows offers. Your settings are restored when you switch this off or close the app.') }),
           toggle('hotkeysEnabled', t('Global shortcuts'), { hint: t('Ctrl+Alt+R pause / resume rain · Ctrl+Alt+W wallpaper on / off · Ctrl+Alt+S open settings') }),
           { type: 'text', key: 'pauseApps', label: t('Pause for these apps'), placeholder: 'photoshop.exe, premiere.exe', hint: t('Comma separated program names. The wallpaper pauses while one of them is in front.') },
         ] },

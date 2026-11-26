@@ -41,7 +41,7 @@
   "Sync rain and snow with real weather": "Eső és hó a valódi időjárás szerint",
   "Rain, snow and thunder follow the real weather at your location (Open-Meteo).": "Az eső, a hó és a zivatar a tartózkodási helyed valódi időjárását követi (Open-Meteo).",
   "See-through Start menu": "Átlátszó Start menü",
-  "Turns on Windows' transparency effects so Start, the taskbar and its flyouts use blurred glass. Your setting is restored when you switch this off or close the app.": "Bekapcsolja a Windows átlátszósági effektusait, így a Start, a tálca és menüi homályos üvegből lesznek. Kikapcsoláskor vagy az alkalmazás bezárásakor a beállításod visszaáll.",
+  "Turns on Windows' transparency effects and removes the accent colour tint, so Start, the taskbar and its flyouts use the clearest glass Windows offers. Your settings are restored when you switch this off or close the app.": "Bekapcsolja az átlátszósági effektusokat és kikapcsolja a kiemelőszín árnyalatát, így a Start, a tálca és menüi a Windows legátlátszóbb üvegét használják. Kikapcsoláskor vagy bezáráskor a beállításaid visszaállnak.",
   "Folder window opacity": "Mappaablakok átlátszatlansága",
   "Makes File Explorer windows see-through so the rain shows behind them. 100 % = normal.": "Áttetszővé teszi a Fájlkezelő ablakait, így mögöttük látszik az eső. 100 % = normál.",
   "Live weather": "Élő időjárás",
