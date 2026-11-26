@@ -98,6 +98,7 @@
   uniform vec2 uParallax;      // background offset (cursor parallax)
   uniform float uPZoom;        // background over-scan for parallax
   uniform float uPulse;        // music level: lights behind the glass pulse
+  uniform float uSnowPile;     // 0..1 snow drift building up on the bottom of the window
 
   float hash(vec2 p) {
     p = fract(p * vec2(123.34, 456.21));
@@ -132,17 +133,31 @@
     return line * seg * (0.5 + 0.5 * h / density);
   }
 
-  // Snow falling outside: soft drifting flakes.
-  float snowLayer(vec2 uv, float scale, float speed, float seed) {
+  // Snow falling outside: flakes of different sizes that flutter and drift
+  // with the wind. Near layers are bigger, faster and out of focus.
+  float flakeField(vec2 uv, float scale, float speed, float size, float soft, float density, float seed) {
     float aspect = uRes.x / uRes.y;
     vec2 p = vec2(uv.x * aspect, uv.y) * scale;
-    p.y += uTime * speed;
-    p.x += sin(uTime * 0.6 + p.y * 0.35 + seed) * 0.35;
-    vec2 id = floor(p), f = fract(p);
-    float h = hash(id + seed);
-    vec2 c = vec2(0.2 + 0.6 * hash(id * 1.3 + seed), 0.2 + 0.6 * hash(id * 2.7 + seed));
-    float r = 0.06 + 0.1 * h;
-    return smoothstep(r, r * 0.25, length(f - c)) * step(0.35, h);
+    float t = uTime * speed;
+    p.y += t;
+    p.x += t * 0.28 + sin(uTime * 0.17 + seed) * 0.9;     // wind drift + slow gusts
+    vec2 id0 = floor(p);
+    float acc = 0.0;
+    for (int j = -1; j <= 1; j++) {
+      for (int i = -1; i <= 1; i++) {
+        vec2 id = id0 + vec2(float(i), float(j));
+        float h = hash(id + seed);
+        if (h > density) continue;
+        vec2 c = id + vec2(hash(id * 1.31 + seed), hash(id * 2.73 + seed));
+        float ph = hash(id * 4.11 + seed) * 6.283;
+        c.x += sin(uTime * (0.7 + h) + ph) * 0.28;          // flutter
+        c.y += cos(uTime * (0.5 + h) * 0.8 + ph) * 0.12;
+        float r = size * (0.45 + 0.9 * hash(id * 5.93 + seed));
+        float d = length(p - c);
+        acc += smoothstep(r, r * soft, d) * (0.6 + 0.4 * hash(id * 7.7 + seed));
+      }
+    }
+    return acc;
   }
 
   // Ridged fbm → branching ice-crystal veins.
@@ -206,8 +221,15 @@
 
     // Snow falling outside the window.
     if (uSnowMode > 0.5 && uStreaks > 0.0) {
-      float sn = snowLayer(uv, 9.0, 0.35, 1.0) * 0.5 + snowLayer(uv, 16.0, 0.55, 5.0) * 0.7 + snowLayer(uv, 28.0, 0.8, 9.0) * 0.5;
-      glass += sn * uStreaks * (0.25 + luma(gBlur) * 0.4) * (1.0 - fog * 0.5);
+      float dens = 0.25 + 0.6 * uStreaks;
+      float far  = flakeField(uv, 34.0, 1.6, 0.07, 0.15, dens, 1.0);
+      float mid  = flakeField(uv, 15.0, 1.15, 0.09, 0.2, dens * 0.85, 5.0);
+      float near = flakeField(uv, 6.5, 0.85, 0.11, 0.35, dens * 0.6, 9.0);
+      float bokeh = flakeField(uv, 2.4, 0.5, 0.16, 0.0, 0.18 + 0.2 * uStreaks, 13.0);
+      vec3 lit = vec3(0.92, 0.95, 1.0) * (0.45 + luma(gBlur) * 0.6);
+      glass = mix(glass, glass * 0.9 + lit * 0.12, uStreaks * 0.35);    // snowy haze
+      float sn = far * 0.35 + mid * 0.6 + near * 0.85 + bokeh * 0.22;
+      glass = mix(glass, lit, clamp(sn * (0.35 + 0.65 * uStreaks), 0.0, 0.95) * (1.0 - fog * 0.4));
     }
     // Rain streaks outside the window.
     else if (uStreaks > 0.0) {
@@ -255,14 +277,44 @@
 
     vec3 col = mix(glass, drop, cov);
 
-    // Snow stuck on the glass (on top of everything, granular and slightly lit).
+    // Snow stuck on the glass: packed crystals with relief, thin edges let light through.
     float sc = texture(uSnow, uv).r;
     if (sc > 0.002) {
-      float grain = 0.7 + 0.6 * noise(uv * uRes / 3.0);
-      float cover = smoothstep(0.05, 0.55, sc * grain);
-      vec3 snowCol = vec3(0.92, 0.95, 1.0) * (0.55 + luma(gBlur) * 0.55);
-      snowCol += step(0.985, hash(floor(uv * uRes / 2.0))) * 0.25 * uReflection;   // sparkles
-      col = mix(col, snowCol, cover * 0.92);
+      vec2 px = 2.0 / uRes;
+      float sx = texture(uSnow, uv + vec2(px.x, 0.0)).r - texture(uSnow, uv - vec2(px.x, 0.0)).r;
+      float sy = texture(uSnow, uv + vec2(0.0, px.y)).r - texture(uSnow, uv - vec2(0.0, px.y)).r;
+      vec2 fp = uv * uRes / uRes.y;
+      float crystal = frostPattern(fp * 80.0);
+      float grain = 0.75 + 0.5 * noise(uv * uRes / 2.5);
+      float dens = sc * grain * (0.75 + 0.35 * crystal);
+      float cover = smoothstep(0.04, 0.55, dens);
+      float light = clamp(0.5 + (sx - sy) * 4.0, 0.0, 1.0);          // light from the upper left
+      vec3 snowCol = vec3(0.93, 0.96, 1.0) * (0.5 + luma(gBlur) * 0.55);
+      snowCol *= 0.78 + 0.44 * light;
+      vec3 thin = mix(gBlur * 1.1, vec3(0.86, 0.91, 1.0), 0.4);          // translucent edges
+      snowCol = mix(thin, snowCol, smoothstep(0.3, 0.95, dens));
+      snowCol += step(0.985, hash(floor(uv * uRes / 2.0))) * 0.3 * uReflection * light;   // sparkles
+      col = mix(col, snowCol, cover * 0.9);
+    }
+
+    // Snow drift on the bottom of the window, higher in the corners.
+    if (uSnowPile > 0.001) {
+      float ax = uv.x * uRes.x / uRes.y;
+      float contour = 0.085 + 0.05 * noise(vec2(ax * 2.5, 1.7)) + 0.012 * noise(vec2(ax * 9.0, 4.2)) + 0.004 * noise(vec2(ax * 40.0, 8.0));
+      float side = smoothstep(0.22, 0.0, min(uv.x, 1.0 - uv.x));
+      float h = uSnowPile * (contour + side * side * 0.14);
+      float d = h - uv.y;                                                   // > 0 inside the drift
+      float edgeSoft = 1.5 / uRes.y;
+      float pm = smoothstep(-edgeSoft, edgeSoft, d);
+      if (pm > 0.0) {
+        float depth = clamp(d / max(h, 0.001), 0.0, 1.0);
+        vec3 pc = vec3(0.93, 0.96, 1.0) * (0.55 + luma(gBlur) * 0.5);
+        pc *= 1.08 - depth * 0.3;                                           // lit surface, bluish shadow below
+        pc = mix(pc, pc * vec3(0.82, 0.88, 1.0), depth * 0.6);
+        pc *= 0.9 + 0.2 * noise(uv * uRes / 3.0);
+        pc += step(0.992, hash(floor(uv * uRes / 2.0) + 3.0)) * 0.35 * uReflection * (1.0 - depth);
+        col = mix(col, pc, pm);
+      }
     }
 
     // ---- glass reflections -----------------------------------------------

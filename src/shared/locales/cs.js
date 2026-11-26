@@ -13,6 +13,8 @@
   "System": "Systém",
   "Choose any image from your computer. The rain layer never modifies it.": "Vyber si libovolný obrázek nebo video. Vrstva deště ho nikdy nemění.",
   "Physics of the water on the glass.": "Fyzika vody na skle.",
+  "Rain or snow": "Déšť nebo sníh",
+  "Precipitation": "Srážky",
   "Rain & snow": "Déšť a sníh",
   "Restart weather": "Restart počasí",
   "Rain or snow on the glass and how it behaves.": "Déšť nebo sníh na skle a jak se chová.",

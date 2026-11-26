@@ -14,6 +14,7 @@
     'Choose any image from your computer. The rain layer never modifies it.': 'Vyber si akýkoľvek obrázok alebo video. Vrstva dažďa ho nikdy nemení.',
     'Physics of the water on the glass.': 'Fyzika vody na skle.',
     'Rain & snow': 'Dážď a sneh',
+    'Rain or snow': 'Dážď alebo sneh', 'Precipitation': 'Zrážky',
     'Restart weather': 'Reštart počasia',
     'Rain or snow on the glass and how it behaves.': 'Dážď alebo sneh na skle a ako sa správa.',
     'Optical properties of the window and the water lenses.': 'Optické vlastnosti okna a vodných šošoviek.',

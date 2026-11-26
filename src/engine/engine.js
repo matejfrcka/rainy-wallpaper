@@ -332,8 +332,13 @@
       const k = dt > 0 ? Math.min(1, dt * 3) : 0;
       cur[0] += (tgt[0] - cur[0]) * k;
       cur[1] += (tgt[1] - cur[1]) * k;
+      // Snow drift on the window sill grows while it snows and melts in the rain.
+      const snowing = this.settings.precipitation === 'snow';
+      const target = snowing ? 0.35 + 0.65 * ((this.settings.snowIntensity ?? 50) / 100) : 0;
+      if (this.snowPile == null) this.snowPile = target;
+      if (dt > 0 && !this.paused) this.snowPile += (target - this.snowPile) * Math.min(1, dt / (snowing ? (this.snowPile < target * 0.5 ? 5 : 45) : 20));
       // Content moves against the cursor → depth behind the glass.
-      return { parallax: [cur[0] * amt * 0.05, -cur[1] * amt * 0.05], pzoom: 1 + amt * 0.06, pulse: this.musicLevel * ((this.settings.musicGlow ?? 60) / 100) };
+      return { parallax: [cur[0] * amt * 0.05, -cur[1] * amt * 0.05], pzoom: 1 + amt * 0.06, pulse: this.musicLevel * ((this.settings.musicGlow ?? 60) / 100), snowPile: this.snowPile };
     }
 
     renderOnce() {

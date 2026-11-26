@@ -38,10 +38,27 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'rainmedia', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
 ]);
 
-if (!app.requestSingleInstanceLock()) {
+const isNewer = (a, b) => {
+  const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+  return false;
+};
+const self = { version: app.getVersion(), exe: process.env.PORTABLE_EXECUTABLE_FILE || process.execPath, args: process.argv.slice(1) };
+if (!app.requestSingleInstanceLock(self)) {
   app.quit();
 } else {
-  app.on('second-instance', () => showSettings());
+  // A newer build started while this one runs in the tray → hand over to it
+  // (otherwise the old version would just open its own settings).
+  app.on('second-instance', (_e, _argv, _cwd, other) => {
+    if (other && other.exe && isNewer(other.version, app.getVersion())) {
+      log(`newer version ${other.version} started, handing over`);
+      app.releaseSingleInstanceLock();
+      require('child_process').spawn(other.exe, other.args || [], { detached: true, stdio: 'ignore' }).unref();
+      app.quit();
+      return;
+    }
+    showSettings();
+  });
   app.whenReady().then(init);
 }
 

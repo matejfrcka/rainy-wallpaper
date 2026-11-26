@@ -179,9 +179,17 @@
     /** A snowflake sticking to the glass (rendered into the snow layer). */
     spawnFlake() {
       const u = this.unit;
-      const clump = chance(0.08) ? rand(2, 3.5) : 1;
-      const r = rand(0.8, 3.2) * u * (0.35 + this.params.flakeSize * 1.5) * clump;
-      if (this.cmd.snow.length < 4 * 20000) this.cmd.snow.push(rand(0, this.width), rand(0, this.height), r, rand(0.55, 1));
+      const clump = chance(0.04) ? rand(1.5, 2.2) : 1;
+      const r = rand(0.7, 2.6) * u * (0.3 + this.params.flakeSize * 1.3) * clump;
+      const x = rand(0, this.width), y = rand(0, this.height), a = rand(0.5, 0.95);
+      if (this.cmd.snow.length >= 4 * 20000) return;
+      this.cmd.snow.push(x, y, r, a);
+      // A few smaller lobes around it → irregular, crystal-like flakes instead of round dots.
+      const lobes = r > u ? 1 + Math.floor(Math.random() * 3) : 0;
+      for (let i = 0; i < lobes; i++) {
+        const ang = rand(0, Math.PI * 2), dist = r * rand(0.6, 1.2);
+        this.cmd.snow.push(x + Math.cos(ang) * dist, y + Math.sin(ang) * dist, r * rand(0.25, 0.5), a * rand(0.5, 0.9));
+      }
     }
 
     /** Remove tiny droplets (and snow) under a disc (destination-out). */

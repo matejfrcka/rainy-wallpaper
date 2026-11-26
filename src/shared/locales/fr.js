@@ -13,6 +13,8 @@
   "System": "Système",
   "Choose any image from your computer. The rain layer never modifies it.": "Choisis n'importe quelle image ou vidéo. La couche de pluie ne la modifie jamais.",
   "Physics of the water on the glass.": "Physique de l'eau sur la vitre.",
+  "Rain or snow": "Pluie ou neige",
+  "Precipitation": "Précipitations",
   "Rain & snow": "Pluie et neige",
   "Restart weather": "Relancer la météo",
   "Rain or snow on the glass and how it behaves.": "Pluie ou neige sur la vitre et son comportement.",

@@ -70,10 +70,10 @@
       ],
     },
     {
-      id: 'rain', title: t('Rain & snow'), lead: t('Rain or snow on the glass and how it behaves.'),
+      id: 'rain', title: t('Weather'), lead: t('Rain or snow on the glass and how it behaves.'),
       groups: [
-        { title: t('Weather'), items: [
-          seg('precipitation', t('Weather'), [['rain', t('Rain')], ['snow', t('Snow')]], { hint: t('Snow shows its own settings below.') }),
+        { title: t('Rain or snow'), items: [
+          seg('precipitation', t('Precipitation'), [['rain', t('Rain')], ['snow', t('Snow')]], { hint: t('Snow shows its own settings below.') }),
         ] },
         { title: t('Snow'), showIf: (st) => st.precipitation === 'snow', items: [
           slider('snowIntensity', t('Snow intensity'), { hint: t('How much snow sticks to the glass.') }),

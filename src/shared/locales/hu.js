@@ -13,6 +13,8 @@
   "System": "Rendszer",
   "Choose any image from your computer. The rain layer never modifies it.": "Válassz bármilyen képet vagy videót. Az esőréteg soha nem módosítja.",
   "Physics of the water on the glass.": "A víz fizikája az üvegen.",
+  "Rain or snow": "Eső vagy hó",
+  "Precipitation": "Csapadék",
   "Rain & snow": "Eső és hó",
   "Restart weather": "Időjárás újraindítása",
   "Rain or snow on the glass and how it behaves.": "Eső vagy hó az üvegen, és hogyan viselkedik.",

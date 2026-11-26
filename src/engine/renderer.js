@@ -469,6 +469,7 @@
       gl.uniform2f(u.uParallax, (ex.parallax || [0, 0])[0], (ex.parallax || [0, 0])[1]);
       gl.uniform1f(u.uPZoom, ex.pzoom || 1);
       gl.uniform1f(u.uPulse, ex.pulse || 0);
+      gl.uniform1f(u.uSnowPile, ex.snowPile || 0);
       gl.uniform1f(u.uSnowMode, s.precipitation === 'snow' ? 1 : 0);
 
       const f = (k, d) => ((s[k] ?? d) / 100);
