@@ -291,6 +291,12 @@
   "Own API key (optional)": "Saját API-kulcs (opcionális)",
   "Pixabay API key": "Pixabay API-kulcs",
   "Leave empty to use the built-in key": "Hagyd üresen a beépített kulcshoz",
-  "Get a free key at pixabay.com/api/docs after logging in.": "Ingyenes kulcsot a pixabay.com/api/docs oldalon kapsz bejelentkezés után."
+  "Get a free key at pixabay.com/api/docs after logging in.": "Ingyenes kulcsot a pixabay.com/api/docs oldalon kapsz bejelentkezés után.",
+  "Abstract": "Absztrakt",
+  "Taskbar": "Tálca",
+  "Default": "Alapértelmezett",
+  "Clear": "Átlátszó",
+  "Frosted": "Matt",
+  "Makes the taskbar see-through so the rain keeps running underneath it. Works best on Windows 10 and Windows 11 21H2; newer Windows 11 builds may partly ignore it.": "Átlátszóvá teszi a tálcát, így az eső alatta is tovább folyik. Windows 10 és Windows 11 21H2 alatt működik a legjobban; az újabb Windows 11 verziók részben figyelmen kívül hagyhatják."
 };
 });

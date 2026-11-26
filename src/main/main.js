@@ -234,6 +234,20 @@ async function setGallery(ref, matchLook = store.get().galleryMatchLook) {
   return applySettings({ backgroundPath: ref });
 }
 
+/* --------------------------------------------------------------- taskbar */
+
+let taskbarTimer = null;
+
+/** See-through taskbar so the rain continues underneath; re-applied because Explorer resets it. */
+function startTaskbar() {
+  clearInterval(taskbarTimer);
+  taskbarTimer = null;
+  const style = store.get().taskbarStyle;
+  const n = win32.setTaskbarStyle(style);
+  log(`taskbar: ${style} (${n} taskbar${n === 1 ? '' : 's'})`);
+  if (style !== 'default') taskbarTimer = setInterval(() => win32.setTaskbarStyle(store.get().taskbarStyle), 400);
+}
+
 /* --------------------------------------------------------------- hotkeys */
 
 function registerHotkeys() {
@@ -365,6 +379,7 @@ function init() {
   screensaver.start();
   monitor.isScreensaver = () => screensaver.active;
   startScheduler();
+  startTaskbar();
   startMetrics();
   registerHotkeys();
   updater.init({ log, getSettings: () => store.get(), onState: () => { pushStatus(); updateTrayMenu(); } });
@@ -523,6 +538,7 @@ function applySettings(partial, origin) {
     if (settingsWin && !settingsWin.isDestroyed()) setTimeout(() => settingsWin.reload(), 150);
   }
   if (changed.includes('hotkeysEnabled')) registerHotkeys();
+  if (changed.includes('taskbarStyle')) startTaskbar();
   if (changed.includes('schedule') || changed.includes('scheduleEnabled')) runSchedule(true);
   if (changed.includes('autoDayNight') && settings.autoDayNight) updateDayNight();
   if (changed.some((k) => ['soundEnabled', 'wallpaperEnabled', 'startWithWindows'].includes(k))) updateTrayMenu();
@@ -694,6 +710,8 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => globalShortcut.unregisterAll());
 
 app.on('before-quit', () => {
+  clearInterval(taskbarTimer);
+  if (store && store.get().taskbarStyle !== 'default') win32.setTaskbarStyle('default');
   if (monitor) monitor.stop();
   if (store) store.flush();
   if (wallpapers) wallpapers.shutdown();

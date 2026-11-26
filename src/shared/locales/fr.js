@@ -291,6 +291,12 @@
   "Own API key (optional)": "Clé API personnelle (facultative)",
   "Pixabay API key": "Clé API Pixabay",
   "Leave empty to use the built-in key": "Laisse vide pour utiliser la clé intégrée",
-  "Get a free key at pixabay.com/api/docs after logging in.": "Obtiens une clé gratuite sur pixabay.com/api/docs après connexion."
+  "Get a free key at pixabay.com/api/docs after logging in.": "Obtiens une clé gratuite sur pixabay.com/api/docs après connexion.",
+  "Abstract": "Abstrait",
+  "Taskbar": "Barre des tâches",
+  "Default": "Par défaut",
+  "Clear": "Transparente",
+  "Frosted": "Givrée",
+  "Makes the taskbar see-through so the rain keeps running underneath it. Works best on Windows 10 and Windows 11 21H2; newer Windows 11 builds may partly ignore it.": "Rend la barre des tâches transparente pour que la pluie continue de couler en dessous. Fonctionne mieux sous Windows 10 et Windows 11 21H2 ; les versions plus récentes de Windows 11 peuvent l'ignorer en partie."
 };
 });

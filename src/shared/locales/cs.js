@@ -291,6 +291,12 @@
   "Own API key (optional)": "Vlastní API klíč (volitelné)",
   "Pixabay API key": "Pixabay API klíč",
   "Leave empty to use the built-in key": "Nech prázdné pro vestavěný klíč",
-  "Get a free key at pixabay.com/api/docs after logging in.": "Bezplatný klíč získáš po přihlášení na pixabay.com/api/docs."
+  "Get a free key at pixabay.com/api/docs after logging in.": "Bezplatný klíč získáš po přihlášení na pixabay.com/api/docs.",
+  "Abstract": "Abstraktní",
+  "Taskbar": "Hlavní panel",
+  "Default": "Výchozí",
+  "Clear": "Průhledný",
+  "Frosted": "Matný",
+  "Makes the taskbar see-through so the rain keeps running underneath it. Works best on Windows 10 and Windows 11 21H2; newer Windows 11 builds may partly ignore it.": "Zprůhlední hlavní panel, takže déšť stéká i pod ním. Nejlépe funguje na Windows 10 a Windows 11 21H2; novější verze Windows 11 to mohou částečně ignorovat."
 };
 });

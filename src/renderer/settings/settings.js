@@ -150,6 +150,7 @@
           toggle('pauseOnFullscreen', t('Pause when a fullscreen app or game runs')),
           toggle('pauseWhenCovered', t('Pause on monitors covered by maximized windows'), { hint: t('Saves GPU while you work; sound keeps playing.') }),
           toggle('pauseOnBattery', t('Pause on battery power')),
+          seg('taskbarStyle', t('Taskbar'), [['default', t('Default')], ['clear', t('Clear')], ['blur', t('Blur')], ['acrylic', t('Frosted')]], { hint: t('Makes the taskbar see-through so the rain keeps running underneath it. Works best on Windows 10 and Windows 11 21H2; newer Windows 11 builds may partly ignore it.') }),
           toggle('hotkeysEnabled', t('Global shortcuts'), { hint: t('Ctrl+Alt+R pause / resume rain · Ctrl+Alt+W wallpaper on / off · Ctrl+Alt+S open settings') }),
           { type: 'text', key: 'pauseApps', label: t('Pause for these apps'), placeholder: 'photoshop.exe, premiere.exe', hint: t('Comma separated program names. The wallpaper pauses while one of them is in front.') },
         ] },
@@ -370,7 +371,7 @@
   function renderTypeSeg() { for (const b of typeSeg.children) b.classList.toggle('active', b.__v === onl.type); }
   renderTypeSeg();
   const CATS = [['rainy street', t('Rain')], ['city night', t('Night city')], ['forest fog', t('Forest')], ['mountains lake', t('Mountains')],
-    ['snow winter', t('Snow')], ['cozy cabin', t('Cozy')], ['autumn', t('Autumn')], ['ocean waves', t('Ocean')], ['neon', t('Neon')]];
+    ['snow winter', t('Snow')], ['cozy cabin', t('Cozy')], ['autumn', t('Autumn')], ['ocean waves', t('Ocean')], ['neon', t('Neon')], ['abstract', t('Abstract')]];
   const chips = h('div', { class: 'chips' }, CATS.map(([q, label]) => h('button', { class: 'chip-btn', onclick: () => { searchInput.value = q; onl.query = q; onlineSearch(true); } }, label)));
 
   function onlineCard(it, fromHistory) {

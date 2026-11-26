@@ -147,6 +147,12 @@
     "Pixabay API key": "Pixabay API kľúč",
     "Leave empty to use the built-in key": "Nechaj prázdne pre vstavaný kľúč",
     "Get a free key at pixabay.com/api/docs after logging in.": "Bezplatný kľúč získaš po prihlásení na pixabay.com/api/docs.",
+    "Abstract": "Abstraktné",
+    "Taskbar": "Panel úloh",
+    "Default": "Predvolený",
+    "Clear": "Priehľadný",
+    "Frosted": "Matný",
+    "Makes the taskbar see-through so the rain keeps running underneath it. Works best on Windows 10 and Windows 11 21H2; newer Windows 11 builds may partly ignore it.": "Spriehľadní panel úloh, takže dážď steká aj pod ním. Najlepšie funguje na Windows 10 a Windows 11 21H2; novšie verzie Windows 11 to môžu čiastočne ignorovať.",
     'Open Settings': 'Otvoriť nastavenia', 'Change background…': 'Zmeniť pozadie…', 'Quit': 'Ukončiť',
   };
 

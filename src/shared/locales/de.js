@@ -291,6 +291,12 @@
   "Own API key (optional)": "Eigener API-Schlüssel (optional)",
   "Pixabay API key": "Pixabay-API-Schlüssel",
   "Leave empty to use the built-in key": "Leer lassen für den integrierten Schlüssel",
-  "Get a free key at pixabay.com/api/docs after logging in.": "Einen kostenlosen Schlüssel erhältst du nach dem Anmelden auf pixabay.com/api/docs."
+  "Get a free key at pixabay.com/api/docs after logging in.": "Einen kostenlosen Schlüssel erhältst du nach dem Anmelden auf pixabay.com/api/docs.",
+  "Abstract": "Abstrakt",
+  "Taskbar": "Taskleiste",
+  "Default": "Standard",
+  "Clear": "Transparent",
+  "Frosted": "Milchglas",
+  "Makes the taskbar see-through so the rain keeps running underneath it. Works best on Windows 10 and Windows 11 21H2; newer Windows 11 builds may partly ignore it.": "Macht die Taskleiste durchsichtig, damit der Regen darunter weiterläuft. Funktioniert am besten unter Windows 10 und Windows 11 21H2; neuere Windows-11-Versionen ignorieren es teilweise."
 };
 });
