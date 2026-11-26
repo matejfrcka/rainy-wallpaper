@@ -29,6 +29,7 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 let store, wallpapers, monitor, tray, settingsWin, logFile;
+let currentImage = { key: 'none', source: null, path: null, name: null };
 const status = { suspended: false, reason: null, paused: false, fps: 0, error: null };
 
 /** Diagnostic log: %APPDATA%\\Rainy Glass Wallpaper Engine\\rainy-glass.log */
@@ -36,6 +37,40 @@ function log(msg) {
   const line = `[${new Date().toISOString()}] ${msg}\n`;
   try { fs.appendFileSync(logFile, line); } catch { /* ignore */ }
   console.log(line.trimEnd());
+}
+
+/* ------------------------------------------------------- background image */
+
+/** Custom image wins; otherwise the current Windows wallpaper (if enabled). */
+function resolveImage() {
+  const s = store.get();
+  if (s.backgroundPath) {
+    let mtime = 0;
+    try { mtime = fs.statSync(s.backgroundPath).mtimeMs; } catch { /* ignore */ }
+    return { key: `custom|${s.backgroundPath}|${mtime}`, source: 'custom', path: s.backgroundPath, name: path.basename(s.backgroundPath) };
+  }
+  if (s.useSystemWallpaper) {
+    const found = images.findSystemWallpaper(require('./win32').getSystemWallpaperPath());
+    if (found) return { key: `windows|${found.path}|${found.mtime}|${found.size}`, source: 'windows', path: found.path, name: 'Windows wallpaper' };
+  }
+  return { key: 'none', source: null, path: null, name: null };
+}
+
+/** Settings as sent to renderers: plus which image is effectively shown. */
+function withImage(settings) {
+  return { ...settings, imageKey: currentImage.key, imageSource: currentImage.source };
+}
+
+/** Re-resolve the image; broadcast when it changed (e.g. Windows wallpaper slideshow). */
+function refreshImage(force = false) {
+  const next = resolveImage();
+  if (!force && next.key === currentImage.key) return false;
+  currentImage = next;
+  log(`background: ${next.source || 'gradient'} ${next.path || ''}`);
+  const s = withImage(store.get());
+  wallpapers.broadcast('settings:changed', s, ['imageKey']);
+  sendToSettings('settings:changed', s, ['imageKey']);
+  return true;
 }
 
 function fullStatus() {
@@ -65,6 +100,10 @@ function init() {
   if (s.backgroundPath) {
     try { images.validate(s.backgroundPath); } catch { store.update({ backgroundPath: null }); }
   }
+
+  currentImage = resolveImage();
+  log(`background: ${currentImage.source || 'gradient'} ${currentImage.path || ''}`);
+  setInterval(() => refreshImage(), 10000);
 
   registerIpc();
   createTray();
@@ -156,10 +195,14 @@ function applyLoginItem(enabled) {
 
 /** Central place where settings change: persist, broadcast, react to system keys. */
 function applySettings(partial, origin) {
-  const { settings, changed } = store.update(partial);
+  const { settings: raw, changed } = store.update(partial);
+  const prevKey = currentImage.key;
+  if (changed.includes('backgroundPath') || changed.includes('useSystemWallpaper')) currentImage = resolveImage();
+  const settings = withImage(raw);
   if (!changed.length) return settings;
   wallpapers.broadcast('settings:changed', settings, changed);
-  if (!origin || origin !== (settingsWin && settingsWin.webContents)) sendToSettings('settings:changed', settings, changed);
+  // The settings window needs the echo when the effective image changed.
+  if (!origin || origin !== (settingsWin && settingsWin.webContents) || prevKey !== currentImage.key) sendToSettings('settings:changed', settings, changed);
   if (changed.includes('startWithWindows')) applyLoginItem(settings.startWithWindows);
   if (changed.includes('wallpaperEnabled')) {
     if (settings.wallpaperEnabled) wallpapers.enable();
@@ -192,7 +235,7 @@ async function selectImage() {
 
 function registerIpc() {
   ipcMain.handle('state:get', () => ({
-    settings: store.get(),
+    settings: withImage(store.get()),
     presets: store.presets(),
     status: fullStatus(),
     version: app.getVersion(),
@@ -202,7 +245,9 @@ function registerIpc() {
 
   ipcMain.handle('settings:set', (e, partial) => applySettings(partial || {}, e.sender));
   ipcMain.handle('settings:reset', () => {
-    const { settings, changed } = store.reset();
+    const { changed } = store.reset();
+    currentImage = resolveImage();
+    const settings = withImage(store.get());
     wallpapers.broadcast('settings:changed', settings, changed);
     return settings;
   });
@@ -214,16 +259,17 @@ function registerIpc() {
   });
   ipcMain.handle('image:remove', () => applySettings({ backgroundPath: null }));
   ipcMain.handle('image:read', () => {
-    const p = store.get().backgroundPath;
-    if (!p) return null;
-    const { data, mime, name } = images.readImage(p);
-    return { data: new Uint8Array(data.buffer, data.byteOffset, data.byteLength), mime, name, path: p };
+    const img = currentImage;
+    if (!img.path) return null;
+    const { data, mime } = images.readImage(img.path, img.source === 'windows');
+    return { data: new Uint8Array(data.buffer, data.byteOffset, data.byteLength), mime, name: img.name, path: img.path, source: img.source, key: img.key };
   });
 
   ipcMain.handle('preset:save', (_e, name) => store.savePreset(name));
   ipcMain.handle('preset:delete', (_e, name) => store.deletePreset(name));
   ipcMain.handle('preset:apply', (_e, name) => {
-    const { settings, changed } = store.applyPreset(name);
+    const { changed } = store.applyPreset(name);
+    const settings = withImage(store.get());
     wallpapers.broadcast('settings:changed', settings, changed);
     return settings;
   });
@@ -252,7 +298,7 @@ function registerIpc() {
     if (res.canceled || !res.filePaths.length) return null;
     const out = path.join(res.filePaths[0], 'RainyGlass');
     const s = store.get();
-    buildWallpaperEngineProject(out, s, s.backgroundPath);
+    buildWallpaperEngineProject(out, s, currentImage.source === 'custom' ? currentImage.path : null);
     shell.openPath(out);
     return out;
   });

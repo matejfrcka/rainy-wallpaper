@@ -44,10 +44,50 @@ async function pickImage(parent) {
   return validate(res.filePaths[0]);
 }
 
-function readImage(file) {
-  validate(file);
+/** Like validate() but for the Windows wallpaper, which may lack an extension (TranscodedWallpaper). */
+function validateSystem(file) {
+  if (typeof file !== 'string' || !path.isAbsolute(file)) throw new Error('Invalid file path');
+  const st = fs.statSync(file);
+  if (!st.isFile() || st.size > MAX_BYTES || st.size < 16) throw new Error('Invalid wallpaper file');
+  const fd = fs.openSync(file, 'r');
+  const head = Buffer.alloc(16);
+  fs.readSync(fd, head, 0, 16, 0);
+  fs.closeSync(fd);
+  if (!sniff(head)) throw new Error('Unsupported wallpaper format');
+  return st;
+}
+
+/**
+ * Locate the current Windows desktop wallpaper.
+ * @param {string|null} spiPath  path reported by SystemParametersInfo
+ * @returns {{path:string, mtime:number, size:number}|null}
+ */
+function findSystemWallpaper(spiPath) {
+  // Empty path = solid colour background: nothing to use.
+  if (!spiPath) return null;
+  const candidates = [spiPath];
+  if (process.env.APPDATA) {
+    const themes = path.join(process.env.APPDATA, 'Microsoft', 'Windows', 'Themes');
+    candidates.push(path.join(themes, 'TranscodedWallpaper'));
+    try {
+      const cached = path.join(themes, 'CachedFiles');
+      for (const f of fs.readdirSync(cached)) candidates.push(path.join(cached, f));
+    } catch { /* none */ }
+  }
+  for (const c of candidates) {
+    try {
+      const st = validateSystem(c);
+      return { path: c, mtime: st.mtimeMs, size: st.size };
+    } catch { /* try next */ }
+  }
+  return null;
+}
+
+function readImage(file, system = false) {
+  if (system) validateSystem(file);
+  else validate(file);
   const data = fs.readFileSync(file);
   return { data, mime: sniff(data), name: path.basename(file) };
 }
 
-module.exports = { pickImage, readImage, validate, EXTENSIONS };
+module.exports = { pickImage, readImage, validate, findSystemWallpaper, EXTENSIONS };

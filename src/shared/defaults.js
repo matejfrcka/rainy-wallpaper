@@ -11,7 +11,8 @@
 
   const DEFAULT_SETTINGS = Object.freeze({
     // Background layer
-    backgroundPath: null,      // absolute path of the user's image (null = neutral gradient)
+    backgroundPath: null,      // absolute path of the user's image (null = Windows wallpaper / gradient)
+    useSystemWallpaper: true,  // no custom image → use the current Windows desktop wallpaper
     fitMode: 'fill',           // 'fill' | 'fit' | 'stretch'
     bgBrightness: 100,         // 0..200 %
     bgBlur: 0,                 // 0..100

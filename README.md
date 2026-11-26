@@ -6,7 +6,7 @@ The app has two separate layers:
 
 | Layer | What it does |
 |---|---|
-| **1 – Background** | The image you choose (JPG, JPEG, PNG, WEBP, BMP, any resolution or aspect ratio). It is scaled with Fill, Fit or Stretch and you can set the focal point, zoom, brightness and blur. The original file is never modified. |
+| **1 – Background** | Your current Windows wallpaper (used automatically), or an image you choose (JPG, JPEG, PNG, WEBP, BMP, any resolution or aspect ratio). It is scaled with Fill, Fit or Stretch and you can set the focal point, zoom, brightness and blur. The original file is never modified. |
 | **2 – Rain glass** | A separate, transparent water simulation rendered over the background with WebGL2. It works with any background. |
 
 ## Features
@@ -98,7 +98,7 @@ Then in Wallpaper Engine choose **Open Wallpaper → Open from file**, or use th
 
 ## Usage tips
 
-- **Background**: click the image card or drop a file onto the window. Fill crops the image to cover the screen and the position sliders choose which part stays visible. Fit shows the whole image with an ambient blurred border.
+- **Background**: by default the rain is applied over your current Windows wallpaper. A slideshow or Spotlight change is picked up within about 10 s. Choosing a custom image overrides it, and *Remove* switches back to the Windows wallpaper. To pick a custom image, click the image card or drop a file onto the window. Fill crops the image to cover the screen and the position sliders choose which part stays visible. Fit shows the whole image with an ambient blurred border.
 - **Rain**: *Random droplet generation* turned off lets the glass slowly dry. *Merging* turned off keeps drops separate.
 - **Sound** plays from the desktop wallpaper, not from the preview. *Live wallpaper* must be on to hear it.
 - **Performance**: on 4K screens or laptops, set *Frame rate* to 30 and/or *Render resolution* to 70 %.

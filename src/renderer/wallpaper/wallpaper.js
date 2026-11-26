@@ -13,14 +13,14 @@
     return;
   }
 
-  let currentPath;
-  async function loadBackground(path) {
-    if (path === currentPath) return;
-    currentPath = path;
+  let currentKey;
+  async function loadBackground(key) {
+    if (key === currentKey) return;
+    currentKey = key;
     try {
-      if (!path) { engine.setBackground(null); return; }
+      if (!key || key === 'none') { engine.setBackground(null); return; }
       const img = await api.readImage();
-      if (!img || currentPath !== path) return;
+      if (!img || currentKey !== key) return;
       await engine.setBackgroundFromBlob(new Blob([img.data], { type: img.mime }));
     } catch (e) {
       api.reportError('Background: ' + e.message);
@@ -30,7 +30,7 @@
 
   const state = await api.getState();
   engine.setSettings(state.settings);
-  await loadBackground(state.settings.backgroundPath);
+  await loadBackground(state.settings.imageKey);
   engine.start();
 
   if (isPrimary) {
@@ -40,7 +40,7 @@
 
   api.onSettings((settings) => {
     engine.setSettings(settings);
-    loadBackground(settings.backgroundPath);
+    loadBackground(settings.imageKey);
   });
   api.onPause((p) => engine.setPaused(p));
   api.onSuspend((s) => engine.setSuspended(s));

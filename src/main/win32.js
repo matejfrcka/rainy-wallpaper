@@ -223,6 +223,21 @@ function getFullscreenState(ownHandles = new Set()) {
   }
 }
 
+/** Path of the current Windows desktop wallpaper (may have no extension), or null. */
+function getSystemWallpaperPath() {
+  const a = load();
+  if (!a) return null;
+  try {
+    const buf = new Uint16Array(520);
+    if (!a.SystemParametersInfoW(0x0073 /* SPI_GETDESKWALLPAPER */, 520, buf, 0)) return null;
+    const end = buf.indexOf(0);
+    const p = String.fromCharCode(...buf.subarray(0, end < 0 ? buf.length : end));
+    return p || null;
+  } catch {
+    return null;
+  }
+}
+
 /** Re-apply the user's normal wallpaper so the desktop repaints after we exit. */
 function refreshDesktop() {
   const a = load();
@@ -239,4 +254,4 @@ function handleToNumber(handle) {
   try { return hwndFromBuffer(handle); } catch { return 0; }
 }
 
-module.exports = { attachToDesktop, restack, sendToBottom, getFullscreenState, refreshDesktop, handleToNumber, isAvailable: () => !!load() };
+module.exports = { attachToDesktop, restack, getSystemWallpaperPath, sendToBottom, getFullscreenState, refreshDesktop, handleToNumber, isAvailable: () => !!load() };

@@ -44,6 +44,9 @@
       id: 'background', title: 'Background', lead: 'Choose any image from your computer. The rain layer never modifies it.',
       custom: 'image',
       groups: [
+        { title: 'Source', items: [
+          toggle('useSystemWallpaper', 'Use Windows wallpaper automatically', { hint: 'When no custom image is selected, the rain is applied over your current Windows desktop wallpaper.' }),
+        ] },
         { title: 'Layout', items: [
           seg('fitMode', 'Scaling', [['fill', 'Fill'], ['fit', 'Fit'], ['stretch', 'Stretch']], { hint: 'Fill crops to cover the monitor, Fit shows the whole image.' }),
           slider('bgZoom', 'Zoom', { min: 100, max: 200 }),
@@ -144,24 +147,25 @@
     $('#previewBadge').textContent = 'Preview unavailable: ' + e.message;
   }
 
-  let previewPath;
+  let previewKey;
+  let thumbUrl = null;
   async function loadPreviewImage() {
-    const p = settings.backgroundPath;
-    if (p === previewPath) return;
-    previewPath = p;
-    if (!p) { engine && engine.setBackground(null); renderImageCard(null); return; }
+    const key = settings.imageKey;
+    if (key === previewKey) return;
+    previewKey = key;
+    if (!key || key === 'none') { engine && engine.setBackground(null); renderImageCard(null); return; }
     try {
       const img = await api.readImage();
-      if (!img || previewPath !== p) return;
+      if (!img || previewKey !== key) return;
       const blob = new Blob([img.data], { type: img.mime });
       if (engine) await engine.setBackgroundFromBlob(blob);
-      renderImageCard({ url: URL.createObjectURL(blob), name: img.name, path: img.path });
+      if (thumbUrl) URL.revokeObjectURL(thumbUrl);
+      thumbUrl = URL.createObjectURL(blob);
+      renderImageCard({ url: thumbUrl, name: img.name, path: img.path, source: img.source });
     } catch (e) {
       toast('This image could not be decoded: ' + e.message, true);
-      await api.removeImage();
-      settings.backgroundPath = null;
-      previewPath = undefined;
-      loadPreviewImage();
+      if (settings.imageSource === 'custom') applyRemote(await api.removeImage());
+      else { engine && engine.setBackground(null); renderImageCard(null); }
     }
   }
 
@@ -256,10 +260,15 @@
     const thumb = h('div', { class: 'image-thumb', title: 'Click to choose an image', onclick: selectImage });
     if (img) thumb.append(h('img', { src: img.url, alt: '' }));
     else thumb.append(h('div', { class: 'empty' }, icon('upload'), 'Select or drop an image', h('span', { style: 'font-size:11px' }, state.formats.map((f) => f.toUpperCase()).join(' · '))));
-    const meta = h('div', { class: 'image-meta' }, icon('image'), h('div', { class: 'image-name', title: img ? img.path : '' }, img ? img.name : 'No image selected – neutral gradient in use'));
+    const custom = img && img.source === 'custom';
+    const label = custom ? img.name
+      : img ? 'Windows wallpaper (automatic)'
+      : settings.useSystemWallpaper ? 'Windows wallpaper not found – neutral gradient in use' : 'No image selected – neutral gradient in use';
+    const meta = h('div', { class: 'image-meta' }, icon('image'), h('div', { class: 'image-name', title: img ? img.path : '' }, label),
+      img ? h('span', { class: 'preset-tag' }, custom ? 'Custom' : 'Windows') : null);
     const actions = h('div', { class: 'image-actions' },
-      h('button', { class: 'btn primary', onclick: selectImage }, icon('upload'), img ? 'Change image' : 'Select image'),
-      h('button', { class: 'btn danger', onclick: removeImage, disabled: img ? false : 'disabled' }, icon('trash'), 'Remove'));
+      h('button', { class: 'btn primary', onclick: selectImage }, icon('upload'), custom ? 'Change image' : 'Select image'),
+      h('button', { class: 'btn danger', onclick: removeImage, disabled: custom ? false : 'disabled', title: 'Remove the custom image (falls back to the Windows wallpaper)' }, icon('trash'), 'Remove'));
     imageCard.append(thumb, meta, actions);
   }
   renderImageCard(null);
