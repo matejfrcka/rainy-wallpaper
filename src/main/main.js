@@ -376,14 +376,23 @@ function stopTaskbar() {
 /* ------------------------------------------------ glass Explorer windows */
 
 let explorerTimer = null;
+const WIN_BUILD = process.platform === 'win32' ? Number(require('os').release().split('.')[2] || 0) : 0;
+const BACKDROP_OK = WIN_BUILD >= 22621; // Windows 11 22H2+: glass for the top bar only
 function syncExplorerGlass(quitting = false) {
   clearInterval(explorerTimer);
   explorerTimer = null;
   if (process.platform !== 'win32') return;
-  const pct = quitting ? 100 : store.get().explorerOpacity;
-  win32.setExplorerOpacity(pct);
-  if (pct < 100) explorerTimer = setInterval(() => win32.setExplorerOpacity(store.get().explorerOpacity), 1000);
-  log('explorer windows: ' + pct + ' %');
+  const s = store.get();
+  const pct = quitting ? 100 : s.explorerOpacity;
+  const glass = quitting || !BACKDROP_OK ? 'off' : s.explorerGlass;
+  const apply = () => {
+    const cur = store.get();
+    win32.setExplorerOpacity(quitting ? 100 : cur.explorerOpacity);
+    if (BACKDROP_OK) win32.setExplorerBackdrop(quitting ? 'off' : cur.explorerGlass);
+  };
+  apply();
+  if (pct < 100 || glass !== 'off') explorerTimer = setInterval(apply, 1000);
+  log(`explorer windows: ${pct} %, top bar ${glass} (build ${WIN_BUILD})`);
 }
 
 /* ------------------------------------------- music, widget, RGB lighting */
@@ -729,7 +738,7 @@ function applySettings(partial, origin) {
   if (changed.includes('hotkeysEnabled')) registerHotkeys();
   if (changed.includes('taskbarStyle') || changed.includes('taskbarLightIcons')) startTaskbar();
   if (changed.includes('startTransparent')) syncStartTransparency();
-  if (changed.includes('explorerOpacity')) syncExplorerGlass();
+  if (changed.includes('explorerOpacity') || changed.includes('explorerGlass')) syncExplorerGlass();
   if (changed.some((k) => ['widgetMedia', 'rgbEnabled', 'wallpaperEnabled'].includes(k))) syncExtras();
   if (changed.includes('spanMonitors') || changed.includes('backgroundPath') || changed.includes('useSystemWallpaper')) wallpapers.updateSpan();
   if (changed.includes('schedule') || changed.includes('scheduleEnabled')) runSchedule(true);
@@ -766,6 +775,7 @@ function registerIpc() {
     lang: i18n.language,
     store: isStore,
     platform: process.platform,
+    winBuild: WIN_BUILD,
     formats: images.EXTENSIONS,
   }));
 
