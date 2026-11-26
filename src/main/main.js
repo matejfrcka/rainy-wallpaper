@@ -596,7 +596,7 @@ function updateTrayMenu() {
     { label: t('Open Settings'), click: showSettings },
     { type: 'separator' },
     { label: t('Live wallpaper'), type: 'checkbox', checked: s.wallpaperEnabled, click: (i) => applySettings({ wallpaperEnabled: i.checked }) },
-    { label: wallpapers.paused ? t('Resume rain') : t('Pause rain'), click: () => setPaused(!wallpapers.paused) },
+    { label: wallpapers.paused ? t('Resume') : t('Pause'), click: () => setPaused(!wallpapers.paused) },
     { label: t('Change background…'), click: () => selectImage() },
     { label: t('Rain sound'), type: 'checkbox', checked: s.soundEnabled, click: (i) => applySettings({ soundEnabled: i.checked }) },
     { label: t('Sleep timer'), submenu: [

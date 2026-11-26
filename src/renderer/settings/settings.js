@@ -70,7 +70,7 @@
       ],
     },
     {
-      id: 'rain', title: t('Rain'), lead: t('Physics of the water on the glass.'),
+      id: 'rain', title: t('Rain & snow'), lead: t('Rain or snow on the glass and how it behaves.'),
       groups: [
         { title: t('Weather'), items: [
           seg('precipitation', t('Weather'), [['rain', t('Rain')], ['snow', t('Snow')]], { hint: t('Snow shows its own settings below.') }),
@@ -799,7 +799,7 @@
   const btnPause = $('#btnPause');
   function renderPause() {
     btnPause.innerHTML = '';
-    btnPause.append(icon(paused ? 'play' : 'pause'), h('span', {}, paused ? t('Resume rain') : t('Pause rain')));
+    btnPause.append(icon(paused ? 'play' : 'pause'), h('span', {}, paused ? t('Resume') : t('Pause')));
   }
   btnPause.addEventListener('click', () => { paused = !paused; engine && engine.setPaused(paused); renderPause(); api.setPaused(paused); });
   $('#btnResetRain').addEventListener('click', () => { engine && engine.reset(); api.resetRain(); });

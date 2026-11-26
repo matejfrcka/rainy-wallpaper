@@ -13,6 +13,9 @@
     'Background': 'Pozadie', 'Rain': 'Dážď', 'Glass': 'Sklo', 'Atmosphere': 'Atmosféra', 'Presets': 'Predvoľby', 'System': 'Systém',
     'Choose any image from your computer. The rain layer never modifies it.': 'Vyber si akýkoľvek obrázok alebo video. Vrstva dažďa ho nikdy nemení.',
     'Physics of the water on the glass.': 'Fyzika vody na skle.',
+    'Rain & snow': 'Dážď a sneh',
+    'Restart weather': 'Reštart počasia',
+    'Rain or snow on the glass and how it behaves.': 'Dážď alebo sneh na skle a ako sa správa.',
     'Optical properties of the window and the water lenses.': 'Optické vlastnosti okna a vodných šošoviek.',
     'Sound and light. Audio plays from the desktop wallpaper.': 'Zvuk a svetlo. Zvuk hrá z tapety na ploche.',
     'Save and load your favourite looks. Presets never change your image.': 'Ukladaj a načítaj obľúbené vzhľady. Predvoľby nikdy nemenia tvoj obrázok.',
@@ -86,7 +89,7 @@
     'Wallpaper FPS ': 'FPS tapety ', 'CPU ': 'CPU ', 'RAM ': 'RAM ', 'GPU ': 'GPU ', ' · Primary': ' · Hlavný', ' · paused (covered)': ' · pozastavený (zakrytý)',
     'Automatic': 'Automaticky', 'English': 'English', 'Slovenčina': 'Slovenčina', 'Version': 'Verzia',
     // toolbar & status
-    'Pause rain': 'Pozastaviť dážď', 'Resume rain': 'Pokračovať', 'Restart rain': 'Reštart dažďa', 'Full screen': 'Celá obrazovka',
+    'Pause': 'Pozastaviť', 'Resume': 'Pokračovať', 'Restart rain': 'Reštart dažďa', 'Full screen': 'Celá obrazovka',
     'Reset settings': 'Obnoviť nastavenia', 'Settings restored to defaults': 'Nastavenia obnovené na predvolené', 'Live preview': 'Živý náhľad',
     'Clear the glass and start again': 'Vyčistiť sklo a začať odznova', 'Full screen preview': 'Náhľad na celú obrazovku', 'Restore default effect settings': 'Obnoviť predvolené nastavenia efektu',
     'Monitors ': 'Monitory ', 'Preview ': 'Náhľad ', 'Drops ': 'Kvapky ', 'Preview unavailable: ': 'Náhľad nedostupný: ',
