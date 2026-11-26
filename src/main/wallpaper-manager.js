@@ -16,6 +16,7 @@ class WallpaperManager {
     this.log = log;
     this.onStatus = onStatus;
     this.attach = { mode: null, error: null, failures: 0 };
+    this.covered = new Set();   // display ids hidden behind maximized windows
     this.windows = new Map();      // displayId -> BrowserWindow
     this.enabled = false;
     this.suspended = false;
@@ -143,7 +144,21 @@ class WallpaperManager {
   sendState(win) {
     if (win.isDestroyed()) return;
     win.webContents.send('wallpaper:suspend', this.suspended);
+    win.webContents.send('wallpaper:hidden', this.covered.has(win.__displayId));
     win.webContents.send('wallpaper:pause', this.paused);
+  }
+
+  /** `rects` – physical monitor rects that are fully covered by windows. */
+  setCovered(rects) {
+    const ids = new Set();
+    for (const d of screen.getAllDisplays()) {
+      const r = this.physicalRect(d);
+      if (rects.some((c) => Math.abs(c.x - r.x) < 2 && Math.abs(c.y - r.y) < 2)) ids.add(d.id);
+    }
+    this.covered = ids;
+    for (const win of this.windows.values()) {
+      if (!win.isDestroyed()) win.webContents.send('wallpaper:hidden', ids.has(win.__displayId));
+    }
   }
 
   broadcast(channel, ...args) {
@@ -180,7 +195,7 @@ class WallpaperManager {
     const primary = screen.getPrimaryDisplay();
     return screen.getAllDisplays().map((d) => {
       const r = this.physicalRect(d);
-      return { id: d.id, primary: d.id === primary.id, width: r.width, height: r.height, scaleFactor: d.scaleFactor, refreshRate: d.displayFrequency || 60, active: this.windows.has(d.id) };
+      return { id: d.id, primary: d.id === primary.id, width: r.width, height: r.height, scaleFactor: d.scaleFactor, refreshRate: d.displayFrequency || 60, active: this.windows.has(d.id), covered: this.covered.has(d.id) };
     });
   }
 

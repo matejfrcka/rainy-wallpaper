@@ -58,12 +58,12 @@
   uniform sampler2D uTex;
   uniform vec2 uDir;           // (spread / width, 0) or (0, spread / height)
   void main() {
-    vec3 c = texture(uTex, vUv).rgb * 0.2270270270;
-    c += texture(uTex, vUv + uDir * 1.3846153846).rgb * 0.3162162162;
-    c += texture(uTex, vUv - uDir * 1.3846153846).rgb * 0.3162162162;
-    c += texture(uTex, vUv + uDir * 3.2307692308).rgb * 0.0702702703;
-    c += texture(uTex, vUv - uDir * 3.2307692308).rgb * 0.0702702703;
-    outColor = vec4(c, 1.0);
+    vec4 c = texture(uTex, vUv) * 0.2270270270;
+    c += texture(uTex, vUv + uDir * 1.3846153846) * 0.3162162162;
+    c += texture(uTex, vUv - uDir * 1.3846153846) * 0.3162162162;
+    c += texture(uTex, vUv + uDir * 3.2307692308) * 0.0702702703;
+    c += texture(uTex, vUv - uDir * 3.2307692308) * 0.0702702703;
+    outColor = c;                          // alpha preserved (also used as a copy)
   }`;
 
   /** Final composite: glass, condensation, refracting drops, streaks, light. */
@@ -74,8 +74,8 @@
 
   uniform sampler2D uScene;    // background (sharp, after user blur)
   uniform sampler2D uBlur;     // heavily blurred background
-  uniform sampler2D uWater;    // water normal map (DOM orientation)
-  uniform sampler2D uFog;      // condensation clear mask (DOM orientation)
+  uniform sampler2D uWater;    // water normal map (GPU render target)
+  uniform sampler2D uFog;      // condensation clear mask (GPU render target)
   uniform vec2 uRes;
   uniform float uTime;
   uniform float uRefraction;
@@ -125,7 +125,6 @@
 
   void main() {
     vec2 uv = vUv;
-    vec2 duv = vec2(uv.x, 1.0 - uv.y);
     vec2 aspect = vec2(uRes.y / uRes.x, 1.0);
 
     // ---- glass surface imperfections --------------------------------------
@@ -134,14 +133,15 @@
     vec2 guv = uv + wave * uDistortion * 0.006;
 
     // ---- water map ---------------------------------------------------------
-    vec4 w = texture(uWater, duv);
+    vec4 w = texture(uWater, uv);
+    w.rgb /= max(w.a, 0.004);              // water map is premultiplied
     float cov = smoothstep(0.30, 0.42, w.a);
     vec2 n = vec2(w.r * 2.0 - 1.0, -(w.g * 2.0 - 1.0));
     float nl = clamp(length(n), 0.0, 1.0);
     float thick = w.b;
 
     // ---- glass (no drop) ---------------------------------------------------
-    float cleared = texture(uFog, duv).r;
+    float cleared = texture(uFog, uv).r;
     float fog = uCondensation * (1.0 - cleared);
     vec3 gSharp = texture(uScene, guv).rgb;
     vec3 gBlur = texture(uBlur, guv).rgb;
@@ -226,6 +226,48 @@
     outColor = vec4(col, 1.0);
   }`;
 
+  /** Instanced sprites for the GPU water map (drops, droplets, wipes, fog). */
+  const SPRITE_VERT = `#version 300 es
+  layout(location = 0) in vec2 aCorner;
+  layout(location = 1) in vec4 aRect;    // x, y, w, h in simulation pixels (top-left origin)
+  layout(location = 2) in vec2 aMeta;    // atlas bucket, alpha
+  uniform vec2 uRes;
+  out vec2 vUv;
+  out float vBucket;
+  out float vAlpha;
+  void main() {
+    vec2 p = aRect.xy + aCorner * aRect.zw;
+    vUv = aCorner;
+    vBucket = aMeta.x;
+    vAlpha = aMeta.y;
+    gl_Position = vec4(p.x / uRes.x * 2.0 - 1.0, 1.0 - p.y / uRes.y * 2.0, 0.0, 1.0);
+  }`;
+
+  const SPRITE_FRAG = `#version 300 es
+  precision highp float;
+  in vec2 vUv;
+  in float vBucket;
+  in float vAlpha;
+  out vec4 outColor;
+  uniform sampler2D uAtlas;
+  uniform float uBuckets;
+  uniform int uMode;          // 0 drop sprite, 1 soft disc, 2 solid fill
+  uniform vec4 uColor;
+  void main() {
+    if (uMode == 0) {
+      vec4 c = texture(uAtlas, vec2((vBucket + clamp(vUv.x, 0.004, 0.996)) / uBuckets, vUv.y));
+      float a = c.a * vAlpha;
+      outColor = vec4(c.rgb * a, a);        // premultiplied
+    } else if (uMode == 1) {
+      float d = length(vUv * 2.0 - 1.0);
+      float a = d < 0.6 ? mix(1.0, 0.9, d / 0.6) : mix(0.9, 0.0, clamp((d - 0.6) / 0.4, 0.0, 1.0));
+      a *= uColor.a * vAlpha;
+      outColor = vec4(uColor.rgb * a, a);
+    } else {
+      outColor = vec4(uColor.rgb * uColor.a, uColor.a);
+    }
+  }`;
+
   root.RainGlass = root.RainGlass || {};
-  root.RainGlass.Shaders = { VERT, COMPOSE, BLUR, GLASS };
+  root.RainGlass.Shaders = { VERT, COMPOSE, BLUR, GLASS, SPRITE_VERT, SPRITE_FRAG };
 })(typeof self !== 'undefined' ? self : this);

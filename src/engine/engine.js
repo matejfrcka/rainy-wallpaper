@@ -35,7 +35,8 @@
       this.audio = this.opts.audio ? new RG.RainAudio() : null;
       this.running = false;
       this.paused = false;        // user pause (rain frozen, still rendered)
-      this.suspended = false;     // system pause (fullscreen app etc.) – nothing rendered
+      this.suspended = false;     // system pause (fullscreen app etc.) – nothing rendered, audio muted
+      this.hidden = false;        // desktop covered by windows – nothing rendered, audio keeps playing
       this.time = 0;
       this.flashPulses = [];
       this.nextLightning = 8 + Math.random() * 10;
@@ -83,8 +84,102 @@
     }
 
     setBackground(source) {
+      if (!(source && source.tagName === 'VIDEO')) this.stopMedia();
       this.renderer.setBackground(source);
       this.renderOnce();
+    }
+
+    /**
+     * Set the background from a main-process media descriptor:
+     *   { kind: 'image', mime, data } | { kind: 'video', url } | null
+     * Animated GIF / WebP are played frame by frame, videos are streamed.
+     */
+    async setBackgroundMedia(info) {
+      if (!info) { this.setBackground(null); return; }
+      if (info.kind === 'video') return this.setBackgroundVideo(info.url);
+      const blob = new Blob([info.data], { type: info.mime });
+      if ((info.mime === 'image/gif' || info.mime === 'image/webp') && (await this.setBackgroundAnimated(blob, info.mime))) return;
+      return this.setBackgroundFromBlob(blob);
+    }
+
+    async setBackgroundVideo(url) {
+      this.stopMedia();
+      const v = document.createElement('video');
+      v.muted = true; v.loop = true; v.playsInline = true; v.preload = 'auto';
+      v.crossOrigin = 'anonymous';
+      v.src = url;
+      await new Promise((resolve, reject) => {
+        v.onloadeddata = resolve;
+        v.onerror = () => reject(new Error('This video cannot be played (codec not supported?)'));
+      });
+      const media = this.media = { type: 'video', el: v, dirty: true };
+      if (v.requestVideoFrameCallback) {
+        const cb = () => { if (this.media === media) { media.dirty = true; v.requestVideoFrameCallback(cb); } };
+        v.requestVideoFrameCallback(cb);
+      } else media.always = true;
+      this.renderer.setBackground(v);
+      this.syncMediaPlayback();
+      this.renderOnce();
+    }
+
+    /** Returns false when the image is not animated (caller falls back to a still image). */
+    async setBackgroundAnimated(blob, mime) {
+      if (typeof ImageDecoder === 'undefined') return false;
+      try {
+        const dec = new ImageDecoder({ data: await blob.arrayBuffer(), type: mime });
+        await dec.tracks.ready;
+        await dec.completed;
+        const track = dec.tracks.selectedTrack;
+        if (!track || track.frameCount <= 1) { dec.close(); return false; }
+        this.stopMedia();
+        this.renderer.releaseSource();
+        this.media = { type: 'anim', dec, count: track.frameCount, index: 0, next: 0, busy: false };
+        await this.stepAnimation(performance.now(), true);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    async stepAnimation(now, force) {
+      const m = this.media;
+      if (!m || m.type !== 'anim' || m.busy || (!force && now < m.next)) return;
+      m.busy = true;
+      try {
+        const { image } = await m.dec.decode({ frameIndex: m.index });
+        if (this.media !== m) { image.close(); return; }
+        this.renderer.uploadImage(image);
+        m.next = now + Math.max(20, (image.duration || 100000) / 1000);
+        image.close();
+        m.index = (m.index + 1) % m.count;
+      } catch { /* skip frame */ } finally { m.busy = false; }
+    }
+
+    /** Push new video / GIF frames to the GPU (called every rendered frame). */
+    updateMedia(now) {
+      const m = this.media;
+      if (!m) return;
+      if (m.type === 'video' && (m.dirty || m.always) && m.el.readyState >= 2) {
+        m.dirty = false;
+        this.renderer.uploadImage(m.el);
+      } else if (m.type === 'anim') {
+        this.stepAnimation(now);
+      }
+    }
+
+    syncMediaPlayback() {
+      const m = this.media;
+      if (!m || m.type !== 'video') return;
+      if (this.paused || this.suspended || this.hidden) m.el.pause();
+      else m.el.play().catch(() => {});
+    }
+
+    stopMedia() {
+      const m = this.media;
+      this.media = null;
+      if (!m) return;
+      if (m.type === 'video') { m.el.pause(); m.el.removeAttribute('src'); m.el.load(); }
+      if (m.type === 'anim') m.dec.close();
     }
 
     async setBackgroundFromBlob(blob) {
@@ -114,6 +209,7 @@
     /** User pause: freezes the rain but keeps the frame visible. */
     setPaused(p) {
       this.paused = !!p;
+      this.syncMediaPlayback();
       this.renderOnce();
     }
 
@@ -123,7 +219,21 @@
       if (s === this.suspended) return;
       this.suspended = s;
       if (this.audio) this.audio.setSuspended(s);
-      if (!s && this.running) {
+      this.syncMediaPlayback();
+      if (!s) this._resumeLoop();
+    }
+
+    /** Desktop hidden behind windows: stop drawing but keep the ambience playing. */
+    setHidden(h) {
+      h = !!h;
+      if (h === this.hidden) return;
+      this.hidden = h;
+      this.syncMediaPlayback();
+      this._resumeLoop();
+    }
+
+    _resumeLoop() {
+      if (this.running && !this.suspended && !this.hidden) {
         this._last = performance.now();
         cancelAnimationFrame(this.raf);
         this.raf = requestAnimationFrame(this._loop);
@@ -169,7 +279,7 @@
     }
 
     _loop(now) {
-      if (!this.running || this.suspended) return;
+      if (!this.running || this.suspended || this.hidden) return;
       this.raf = requestAnimationFrame(this._loop);
       const limit = this.settings.fpsLimit || 0;
       const elapsed = now - this._last;
@@ -179,6 +289,7 @@
       this.time += dt;
 
       if (!this.paused) {
+        this.updateMedia(now);
         this.sim.update(dt);
         if (this.opts.lightningSource && this.settings.thunderEnabled) {
           this.nextLightning -= dt;
@@ -205,6 +316,7 @@
 
     destroy() {
       this.stop();
+      this.stopMedia();
       this.resizeObserver.disconnect();
       if (this.audio) this.audio.destroy();
       this.renderer.destroy();

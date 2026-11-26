@@ -4,6 +4,7 @@
   const api = window.rainApi;
   const params = new URLSearchParams(location.search);
   const isPrimary = params.get('primary') === '1';
+  const displayId = Number(params.get('display')) || null;
 
   let engine;
   try {
@@ -19,9 +20,9 @@
     currentKey = key;
     try {
       if (!key || key === 'none') { engine.setBackground(null); return; }
-      const img = await api.readImage();
+      const img = await api.readImage(displayId);
       if (!img || currentKey !== key) return;
-      await engine.setBackgroundFromBlob(new Blob([img.data], { type: img.mime }));
+      await engine.setBackgroundMedia(img);
     } catch (e) {
       api.reportError('Background: ' + e.message);
       engine.setBackground(null);
@@ -44,6 +45,7 @@
   });
   api.onPause((p) => engine.setPaused(p));
   api.onSuspend((s) => engine.setSuspended(s));
+  api.onHidden((h) => engine.setHidden(h));
   api.onReset(() => engine.reset());
   api.onLightning((d) => engine.lightning(d, false));
 

@@ -67,7 +67,12 @@ function buildWallpaperEngineProject(outDir, settings = DEFAULT_SETTINGS, imageP
 
   let bundled = null;
   if (imagePath && fs.existsSync(imagePath)) {
-    bundled = 'background' + path.extname(imagePath).toLowerCase();
+    let ext = path.extname(imagePath).toLowerCase();
+    if (!ext) { // e.g. Windows "TranscodedWallpaper" has no extension
+      const head = fs.readFileSync(imagePath).subarray(0, 4);
+      ext = head[0] === 0x89 ? '.png' : head[0] === 0x42 ? '.bmp' : '.jpg';
+    }
+    bundled = 'background' + ext;
     copy(imagePath, path.join(outDir, bundled));
   }
   const project = {

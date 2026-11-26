@@ -21,7 +21,7 @@ contextBridge.exposeInMainWorld('rainApi', {
   selectImage: () => ipcRenderer.invoke('image:select'),
   setImagePath: (p) => ipcRenderer.invoke('image:set', p),
   removeImage: () => ipcRenderer.invoke('image:remove'),
-  readImage: () => ipcRenderer.invoke('image:read'),
+  readImage: (displayId) => ipcRenderer.invoke('image:read', displayId),
   pathForFile: (file) => { try { return webUtils.getPathForFile(file); } catch { return null; } },
 
   // Presets
@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('rainApi', {
   resetRain: () => ipcRenderer.invoke('rain:reset'),
   onPause: on('wallpaper:pause'),
   onSuspend: on('wallpaper:suspend'),
+  onHidden: on('wallpaper:hidden'),
   onReset: on('wallpaper:reset'),
   onLightning: on('wallpaper:lightning'),
   lightning: (distance) => ipcRenderer.send('wallpaper:lightning', distance),

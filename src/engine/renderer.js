@@ -71,6 +71,154 @@
     return c;
   }
 
+  /**
+   * WaterLayer – rasterizes the simulation's draw commands on the GPU with
+   * instanced quads into three render targets:
+   *   droplets (persistent tiny droplets), water (droplets + drops), fog mask.
+   */
+  class WaterLayer {
+    constructor(r) {
+      this.r = r;
+      const gl = this.gl = r.gl;
+      const sh = S();
+      this.prog = program(gl, sh.SPRITE_VERT, sh.SPRITE_FRAG);
+      this.vao = gl.createVertexArray();
+      gl.bindVertexArray(this.vao);
+      const corner = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, corner);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      this.inst = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.inst);
+      gl.enableVertexAttribArray(1);
+      gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 24, 0);
+      gl.vertexAttribDivisor(1, 1);
+      gl.enableVertexAttribArray(2);
+      gl.vertexAttribPointer(2, 2, gl.FLOAT, false, 24, 16);
+      gl.vertexAttribDivisor(2, 1);
+      gl.bindVertexArray(null);
+
+      const atlas = root.RainGlass.RainSimulation.makeDropAtlas();
+      this.buckets = root.RainGlass.RainSimulation.SIZE_BUCKETS;
+      this.atlas = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, this.atlas);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, atlas.width, atlas.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, atlas.data);
+      gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      this.buf = new Float32Array(6 * 8192);
+      this.sizeKey = '';
+    }
+
+    ensure(n) {
+      if (this.buf.length < n * 6) this.buf = new Float32Array(n * 12);
+      return this.buf;
+    }
+
+    /** Draw `count` instances already packed in `data`. */
+    instances(data, count, mode, color, res) {
+      if (!count) return;
+      const gl = this.gl;
+      const { u } = this.prog;
+      gl.uniform1i(u.uMode, mode);
+      gl.uniform4fv(u.uColor, color || [1, 1, 1, 1]);
+      gl.uniform2f(u.uRes, res[0], res[1]);
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.inst);
+      gl.bufferData(gl.ARRAY_BUFFER, data.subarray(0, count * 6), gl.STREAM_DRAW);
+      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, count);
+    }
+
+    /** Pack [x,y,w,h] tuples. */
+    packRects(src, alpha) {
+      const n = src.length / 4, b = this.ensure(n);
+      for (let i = 0, j = 0; i < src.length; i += 4) { b[j++] = src[i]; b[j++] = src[i + 1]; b[j++] = src[i + 2]; b[j++] = src[i + 3]; b[j++] = 0; b[j++] = alpha; }
+      return n;
+    }
+
+    /** Pack [x,y,r] or [x,y,r,alpha] discs. */
+    packDiscs(src, stride) {
+      const n = src.length / stride, b = this.ensure(n);
+      for (let i = 0, j = 0; i < src.length; i += stride) {
+        const r = src[i + 2];
+        b[j++] = src[i] - r; b[j++] = src[i + 1] - r; b[j++] = r * 2; b[j++] = r * 2; b[j++] = 0; b[j++] = stride === 4 ? src[i + 3] : 1;
+      }
+      return n;
+    }
+
+    full(w, h) { const b = this.ensure(1); b.set([0, 0, w, h, 0, 1]); return 1; }
+
+    bindTarget(t) {
+      const gl = this.gl;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
+      gl.viewport(0, 0, t.w, t.h);
+    }
+
+    draw(sim) {
+      const gl = this.gl, r = this.r;
+      const W = sim.width, H = sim.height, res = [W, H];
+      const drp = r.target('droplets', W, H);
+      const fog = r.target('fog', Math.ceil(W / 4), Math.ceil(H / 4));
+      const key = W + 'x' + H;
+      const c = sim.cmd;
+      if (c.reset || key !== this.sizeKey) {
+        this.sizeKey = key;
+        gl.clearColor(0, 0, 0, 0);
+        this.bindTarget(drp); gl.clear(gl.COLOR_BUFFER_BIT);
+        this.bindTarget(fog); gl.clear(gl.COLOR_BUFFER_BIT);
+      }
+
+      const { p, u } = this.prog;
+      gl.useProgram(p);
+      gl.bindVertexArray(this.vao);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, this.atlas);
+      gl.uniform1i(u.uAtlas, 0);
+      gl.uniform1f(u.uBuckets, this.buckets);
+      gl.enable(gl.BLEND);
+      // Premultiplied alpha throughout (matches Canvas2D source-over / destination-out).
+      const NORMAL = () => gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      const ERASE = () => gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
+
+      // Persistent tiny droplets: add, wipe, evaporate.
+      this.bindTarget(drp);
+      NORMAL();
+      this.instances(this.buf, this.packRects(c.tiny, 1), 0, null, res);
+      ERASE();
+      this.instances(this.buf, this.packDiscs(c.wipe, 3), 1, null, res);
+      if (c.evaporate > 0) this.instances(this.buf, this.full(W, H), 2, [0, 0, 0, c.evaporate], res);
+
+      // Condensation mask: moving water clears it, it slowly re-forms.
+      this.bindTarget(fog);
+      NORMAL();
+      this.instances(this.buf, this.packDiscs(c.fog, 4), 1, [1, 1, 1, 1], res);
+      if (c.fogFade > 0) this.instances(this.buf, this.full(W, H), 2, [0, 0, 0, c.fogFade], res);
+
+      // Water map = droplets + drops.
+      gl.disable(gl.BLEND);
+      const water = r.target('water', W, H);
+      r.copy(drp, water);
+      gl.useProgram(p);
+      gl.bindVertexArray(this.vao);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, this.atlas);
+      gl.enable(gl.BLEND);
+      NORMAL();
+      this.bindTarget(water);
+      const n = sim.instanceCount;
+      if (n) {
+        this.instances(sim.instances, n, 0, null, res);
+      }
+      gl.disable(gl.BLEND);
+      sim.consumed();
+      return { water, fog };
+    }
+  }
+
   class GlassRenderer {
     constructor(canvas) {
       this.canvas = canvas;
@@ -104,10 +252,9 @@
       gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
       this.imageTex = this.createTexture(true);
-      this.waterTex = this.createTexture(false);
-      this.fogTex = this.createTexture(false);
       this.maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE);
       this.targets = {};
+      this.waterLayer = new WaterLayer(this);
       this.uploadImage(this.source || makeDefaultBackground());
     }
 
@@ -146,14 +293,23 @@
 
     /** Set the background source (ImageBitmap, HTMLImageElement, canvas) or null for the default. */
     setBackground(source) {
-      if (this.source && this.source !== source && typeof this.source.close === 'function') this.source.close();
+      if (this.source && this.source !== source && typeof this.source.close === 'function' && !(this.source instanceof (root.HTMLVideoElement || Object))) this.source.close();
       this.source = source || null;
       this.uploadImage(this.source || makeDefaultBackground());
     }
 
+    /** Free the current still image (animated/video sources upload frames directly). */
+    releaseSource() {
+      if (this.source && typeof this.source.close === 'function') this.source.close();
+      this.source = null;
+    }
+
     uploadImage(src) {
       const gl = this.gl;
-      this.imageSize = [src.width, src.height];
+      const w = src.videoWidth || src.displayWidth || src.width;
+      const h = src.videoHeight || src.displayHeight || src.height;
+      if (!w || !h) return;
+      this.imageSize = [w, h];
       gl.bindTexture(gl.TEXTURE_2D, this.imageTex);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
@@ -180,6 +336,7 @@
 
     draw(prog, target) {
       const gl = this.gl;
+      gl.bindVertexArray(this.vao);
       if (target) { gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo); gl.viewport(0, 0, target.w, target.h); }
       else { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, this.canvas.width, this.canvas.height); }
       gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -273,8 +430,7 @@
       if (this.sceneDirty) this.updateScene();
       const s = this.settings;
 
-      this.uploadCanvas(this.waterTex, sim.water);
-      this.uploadCanvas(this.fogTex, sim.fog);
+      const wl = this.waterLayer.draw(sim);
 
       const { p, u } = this.progGlass;
       gl.useProgram(p);
@@ -285,8 +441,8 @@
       };
       bind(0, this.sceneTarget.tex, 'uScene');
       bind(1, this.blurTarget.tex, 'uBlur');
-      bind(2, this.waterTex, 'uWater');
-      bind(3, this.fogTex, 'uFog');
+      bind(2, wl.water.tex, 'uWater');
+      bind(3, wl.fog.tex, 'uFog');
       const f = (k, d) => ((s[k] ?? d) / 100);
       gl.uniform2f(u.uRes, this.canvas.width, this.canvas.height);
       gl.uniform1f(u.uTime, time);

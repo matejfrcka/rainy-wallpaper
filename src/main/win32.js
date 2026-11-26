@@ -22,6 +22,9 @@ function load() {
     const koffi = require('koffi');
     const user32 = koffi.load('user32.dll');
     const shell32 = koffi.load('shell32.dll');
+    const dwmapi = koffi.load('dwmapi.dll');
+    const ole32 = koffi.load('ole32.dll');
+    const GUID = koffi.struct('GUID', { d1: 'uint32', d2: 'uint16', d3: 'uint16', d4: koffi.array('uint8', 8) });
 
     const RECT = koffi.struct('RECT', { left: 'int32', top: 'int32', right: 'int32', bottom: 'int32' });
     const MONITORINFO = koffi.struct('MONITORINFO', { cbSize: 'uint32', rcMonitor: RECT, rcWork: RECT, dwFlags: 'uint32' });
@@ -48,6 +51,19 @@ function load() {
       MonitorFromWindow: user32.func('intptr_t __stdcall MonitorFromWindow(intptr_t hwnd, uint32 flags)'),
       GetMonitorInfoW: user32.func('bool __stdcall GetMonitorInfoW(intptr_t monitor, _Inout_ MONITORINFO *info)'),
       SystemParametersInfoW: user32.func('bool __stdcall SystemParametersInfoW(uint32 action, uint32 param, _Inout_ uint16_t *pv, uint32 winIni)'),
+      IsIconic: user32.func('bool __stdcall IsIconic(intptr_t hwnd)'),
+      IsZoomed: user32.func('bool __stdcall IsZoomed(intptr_t hwnd)'),
+      GetWindowTextLengthW: user32.func('int __stdcall GetWindowTextLengthW(intptr_t hwnd)'),
+      DwmGetWindowAttribute: dwmapi.func('int32 __stdcall DwmGetWindowAttribute(intptr_t hwnd, uint32 attr, _Out_ int32 *value, uint32 size)'),
+      CoInitializeEx: ole32.func('int32 __stdcall CoInitializeEx(void *reserved, uint32 flags)'),
+      CoCreateInstance: ole32.func('int32 __stdcall CoCreateInstance(GUID *clsid, void *outer, uint32 ctx, GUID *iid, _Out_ void **ppv)'),
+      CoTaskMemFree: ole32.func('void __stdcall CoTaskMemFree(void *p)'),
+      // IDesktopWallpaper vtable entries (called through koffi.call)
+      P_Release: koffi.proto('uint32 __stdcall IDW_Release(void *self)'),
+      P_GetWallpaper: koffi.proto('int32 __stdcall IDW_GetWallpaper(void *self, str16 monitorId, _Out_ void **path)'),
+      P_GetPathAt: koffi.proto('int32 __stdcall IDW_GetMonitorDevicePathAt(void *self, uint32 index, _Out_ void **id)'),
+      P_GetPathCount: koffi.proto('int32 __stdcall IDW_GetMonitorDevicePathCount(void *self, _Out_ uint32 *count)'),
+      P_GetRect: koffi.proto('int32 __stdcall IDW_GetMonitorRECT(void *self, str16 monitorId, _Out_ RECT *rect)'),
       SHQueryUserNotificationState: shell32.func('int32 __stdcall SHQueryUserNotificationState(_Out_ int32 *state)'),
     };
   } catch (e) {
@@ -223,6 +239,96 @@ function getFullscreenState(ownHandles = new Set()) {
   }
 }
 
+/**
+ * Monitors (physical rects) whose desktop is hidden behind a maximized or
+ * monitor-sized window. Cloaked (suspended UWP / other virtual desktop) and
+ * minimized windows are ignored.
+ */
+function getCoveredMonitors(ownHandles = new Set()) {
+  const a = load();
+  if (!a) return [];
+  const covered = new Map();
+  try {
+    a.EnumWindows((hwnd) => {
+      if (ownHandles.has(Number(hwnd)) || !a.IsWindowVisible(hwnd) || a.IsIconic(hwnd)) return true;
+      if (Number(a.GetWindowLongPtrW(hwnd, GWL_EXSTYLE)) & WS_EX_TOOLWINDOW) return true;
+      if (!a.GetWindowTextLengthW(hwnd)) return true;
+      const cloaked = [0];
+      if (a.DwmGetWindowAttribute(hwnd, 14 /* DWMWA_CLOAKED */, cloaked, 4) === 0 && cloaked[0]) return true;
+      if (IGNORED_CLASSES.has(className(a, hwnd))) return true;
+      const mon = a.MonitorFromWindow(hwnd, 2);
+      if (!mon) return true;
+      const info = { cbSize: 40, rcMonitor: {}, rcWork: {}, dwFlags: 0 };
+      if (!a.GetMonitorInfoW(mon, info)) return true;
+      const r = {};
+      if (!a.GetWindowRect(hwnd, r)) return true;
+      const w = info.rcWork;
+      const fills = r.left <= w.left + 8 && r.top <= w.top + 8 && r.right >= w.right - 8 && r.bottom >= w.bottom - 8;
+      if (a.IsZoomed(hwnd) || fills) {
+        const m = info.rcMonitor;
+        covered.set(`${m.left},${m.top}`, { x: m.left, y: m.top, width: m.right - m.left, height: m.bottom - m.top });
+      }
+      return true;
+    }, 0);
+  } catch { /* ignore */ }
+  return [...covered.values()];
+}
+
+/* ---------------- per-monitor wallpapers (IDesktopWallpaper COM) ---------------- */
+
+const guid = (d1, d2, d3, d4) => ({ d1, d2, d3, d4 });
+const CLSID_DesktopWallpaper = guid(0xc2cf3110, 0x460e, 0x4fc1, [0xb9, 0xd0, 0x8a, 0x1c, 0x0c, 0x9c, 0xc4, 0xbd]);
+const IID_IDesktopWallpaper = guid(0xb92b56a9, 0x8b55, 0x4e14, [0x9a, 0x89, 0x01, 0x99, 0xbb, 0xb6, 0xf9, 0x3b]);
+let desktopWallpaper = null;
+
+function wallpaperCom(a) {
+  if (desktopWallpaper) return desktopWallpaper;
+  a.CoInitializeEx(null, 0x2 /* COINIT_APARTMENTTHREADED */); // S_FALSE / RPC_E_CHANGED_MODE are fine
+  const out = [null];
+  const hr = a.CoCreateInstance(CLSID_DesktopWallpaper, null, 0x1 | 0x4 /* INPROC | LOCAL */, IID_IDesktopWallpaper, out);
+  if (hr < 0 || !out[0]) throw new Error('CoCreateInstance(DesktopWallpaper) failed: 0x' + (hr >>> 0).toString(16));
+  const vtbl = a.koffi.decode(out[0], 'void *');
+  desktopWallpaper = { self: out[0], fn: a.koffi.decode(vtbl, 'void *', 18) };
+  return desktopWallpaper;
+}
+
+function takeString(a, ptr) {
+  if (!ptr) return '';
+  const str = a.koffi.decode(ptr, 'char16_t', -1);
+  a.CoTaskMemFree(ptr);
+  return str;
+}
+
+/**
+ * Wallpaper image for every monitor: [{ rect: {x,y,width,height} (physical), path }].
+ * Returns null when not available (older Windows, COM failure).
+ */
+function getMonitorWallpapers() {
+  const a = load();
+  if (!a) return null;
+  try {
+    const { self, fn } = wallpaperCom(a);
+    const k = a.koffi;
+    const count = [0];
+    if (k.call(fn[6], a.P_GetPathCount, self, count) < 0) return null;
+    const result = [];
+    for (let i = 0; i < count[0]; i++) {
+      const idPtr = [null];
+      if (k.call(fn[5], a.P_GetPathAt, self, i, idPtr) < 0) continue;
+      const id = takeString(a, idPtr[0]);
+      const r = {};
+      if (k.call(fn[7], a.P_GetRect, self, id, r) < 0) continue; // inactive monitor
+      const pPtr = [null];
+      const path = k.call(fn[4], a.P_GetWallpaper, self, id, pPtr) >= 0 ? takeString(a, pPtr[0]) : '';
+      result.push({ rect: { x: r.left, y: r.top, width: r.right - r.left, height: r.bottom - r.top }, path });
+    }
+    return result;
+  } catch (e) {
+    desktopWallpaper = null;
+    return null;
+  }
+}
+
 /** Path of the current Windows desktop wallpaper (may have no extension), or null. */
 function getSystemWallpaperPath() {
   const a = load();
@@ -254,4 +360,4 @@ function handleToNumber(handle) {
   try { return hwndFromBuffer(handle); } catch { return 0; }
 }
 
-module.exports = { attachToDesktop, restack, getSystemWallpaperPath, sendToBottom, getFullscreenState, refreshDesktop, handleToNumber, isAvailable: () => !!load() };
+module.exports = { attachToDesktop, restack, getSystemWallpaperPath, getMonitorWallpapers, getCoveredMonitors, sendToBottom, getFullscreenState, refreshDesktop, handleToNumber, isAvailable: () => !!load() };

@@ -1,8 +1,10 @@
 /**
  * RainSimulation – CPU physics for water on glass.
  *
- * Produces a "water map" canvas every frame which the WebGL renderer uses
- * as a refraction normal map:
+ * The simulation does no drawing itself: it records instanced draw commands
+ * (tiny droplets, wipes, condensation clears, drop sprites) which the GPU
+ * WaterLayer rasterizes into a "water map" render target used as a
+ * refraction normal map:
  *   R,G = surface normal (x,y) encoded 0..1
  *   B   = water thickness (scaled by drop size → larger drops = thicker lens)
  *   A   = water coverage (soft; thresholded in the shader → merging blobs)
@@ -26,19 +28,8 @@
   const rand = (a = 0, b = 1) => a + Math.random() * (b - a);
   const chance = (p) => Math.random() < p;
 
-  function makeCanvas(w, h) {
-    if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(w, h);
-    const c = document.createElement('canvas');
-    c.width = w; c.height = h;
-    return c;
-  }
-
-  /** Normal-encoded drop sprite. `thickness` scales the B channel. */
-  function makeDropSprite(thickness) {
-    const c = makeCanvas(SPRITE, SPRITE);
-    const ctx = c.getContext('2d');
-    const img = ctx.createImageData(SPRITE, SPRITE);
-    const d = img.data;
+  /** Write a normal-encoded drop sprite into an RGBA buffer. `thickness` scales the B channel. */
+  function writeDropSprite(d, stride, ox, thickness) {
     for (let y = 0; y < SPRITE; y++) {
       for (let x = 0; x < SPRITE; x++) {
         const nx = ((x + 0.5) / SPRITE) * 2 - 1;
@@ -46,8 +37,8 @@
         let ny = ((y + 0.5) / SPRITE) * 2 - 1;
         ny = ny < 0 ? ny * 1.12 : ny * 0.96;
         const r2 = nx * nx + ny * ny;
-        const i = (y * SPRITE + x) * 4;
-        if (r2 >= 1) { d[i + 3] = 0; continue; }
+        const i = (y * stride + ox + x) * 4;
+        if (r2 >= 1) { d[i] = 128; d[i + 1] = 128; d[i + 2] = 0; d[i + 3] = 0; continue; }
         const z = Math.sqrt(1 - r2);
         d[i] = Math.round((0.5 + nx * 0.5) * 255);
         d[i + 1] = Math.round((0.5 + ny * 0.5) * 255);
@@ -55,22 +46,6 @@
         d[i + 3] = Math.round(Math.min(1, (1 - r2) * 1.05) * 255);
       }
     }
-    ctx.putImageData(img, 0, 0);
-    return c;
-  }
-
-  /** Soft white disc used to wipe droplets / condensation. */
-  function makeClearSprite() {
-    const s = 64;
-    const c = makeCanvas(s, s);
-    const ctx = c.getContext('2d');
-    const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-    g.addColorStop(0, 'rgba(255,255,255,1)');
-    g.addColorStop(0.6, 'rgba(255,255,255,0.9)');
-    g.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, s, s);
-    return c;
   }
 
   class Drop {
@@ -92,10 +67,10 @@
 
   class RainSimulation {
     constructor(width, height) {
-      this.dropSprites = [];
-      for (let i = 0; i < SIZE_BUCKETS; i++) this.dropSprites.push(makeDropSprite(0.3 + 0.7 * (i / (SIZE_BUCKETS - 1))));
-      this.clearSprite = makeClearSprite();
       this.drops = [];
+      this.cmd = { tiny: [], wipe: [], fog: [], evaporate: 0, fogFade: 0, reset: true };
+      this.instances = new Float32Array(6 * 4096);
+      this.instanceCount = 0;
       this.params = {};
       this.fogFrame = 0;
       this.evapFrame = 0;
@@ -112,16 +87,8 @@
       // Unit so drop sizes look the same on 1080p, 1440p and 4K.
       this.unit = Math.min(width, height) / 540;
 
-      this.water = makeCanvas(width, height);
-      this.waterCtx = this.water.getContext('2d');
-      this.droplets = makeCanvas(width, height);
-      this.dropletsCtx = this.droplets.getContext('2d');
-      this.fog = makeCanvas(Math.ceil(width / 4), Math.ceil(height / 4));
-      this.fogCtx = this.fog.getContext('2d');
-      this.fogCtx.fillStyle = '#000';
-      this.fogCtx.fillRect(0, 0, this.fog.width, this.fog.height);
-
       this.drops = [];
+      this.resetCommands(true);
       this.seed();
     }
 
@@ -162,7 +129,20 @@
 
     clear() {
       this.drops = [];
-      this.dropletsCtx.clearRect(0, 0, this.width, this.height);
+      this.resetCommands(true);
+    }
+
+    resetCommands(reset) {
+      const c = this.cmd;
+      c.tiny.length = 0; c.wipe.length = 0; c.fog.length = 0;
+      c.evaporate = 0; c.fogFade = 0;
+      if (reset) c.reset = true;
+    }
+
+    /** Called by the WaterLayer after it has consumed the commands. */
+    consumed() {
+      this.resetCommands(false);
+      this.cmd.reset = false;
     }
 
     spawnDrop(initial) {
@@ -184,22 +164,33 @@
       const u = this.unit;
       const r = rand(0.5, 2.1) * u * (0.6 + this.params.size * 0.8);
       const x = rand(0, this.width), y = rand(0, this.height);
-      const ctx = this.dropletsCtx;
-      ctx.drawImage(this.dropSprites[0], x - r, y - r, r * 2, r * 2.1);
+      if (this.cmd.tiny.length < 4 * 60000) this.cmd.tiny.push(x - r, y - r, r * 2, r * 2.1);
     }
 
+    /** Remove tiny droplets under a disc (destination-out). */
     wipe(x, y, r) {
-      const ctx = this.dropletsCtx;
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.drawImage(this.clearSprite, x - r, y - r, r * 2, r * 2);
-      ctx.globalCompositeOperation = 'source-over';
+      if (this.cmd.wipe.length < 3 * 20000) this.cmd.wipe.push(x, y, r);
     }
 
+    /** Clear condensation under a disc. */
     clearFog(x, y, r, strength) {
-      const ctx = this.fogCtx;
-      ctx.globalAlpha = strength;
-      ctx.drawImage(this.clearSprite, (x - r) / 4, (y - r) / 4, r / 2, r / 2);
-      ctx.globalAlpha = 1;
+      if (this.cmd.fog.length < 4 * 20000) this.cmd.fog.push(x, y, r, strength);
+    }
+
+    /** Pointer interaction: wipe condensation and droplets along a stroke. */
+    touch(x0, y0, x1, y1, radius) {
+      const r = radius * this.unit;
+      const dist = Math.hypot(x1 - x0, y1 - y0);
+      const steps = Math.max(1, Math.ceil(dist / (r * 0.4)));
+      for (let i = 0; i <= steps; i++) {
+        const x = x0 + (x1 - x0) * (i / steps), y = y0 + (y1 - y0) * (i / steps);
+        this.wipe(x, y, r * 0.8);
+        this.clearFog(x, y, r * 1.2, 1);
+      }
+      // Disturb drops under the finger: they lose grip and slide.
+      for (const d of this.drops) {
+        if (Math.abs(d.x - x1) < r + d.r && Math.abs(d.y - y1) < r + d.r) d.vy += this.params.gravity * 2;
+      }
     }
 
     update(dtSeconds) {
@@ -223,19 +214,13 @@
       // Evaporation of the tiny droplet layer (keeps an equilibrium).
       if ((this.evapFrame += ts) > 20) {
         this.evapFrame = 0;
-        const ctx = this.dropletsCtx;
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.fillStyle = `rgba(0,0,0,${0.03 + (1 - p.density) * 0.08})`;
-        ctx.fillRect(0, 0, this.width, this.height);
-        ctx.globalCompositeOperation = 'source-over';
+        this.cmd.evaporate = Math.min(1, this.cmd.evaporate + 0.03 + (1 - p.density) * 0.08);
       }
 
       // Condensation slowly re-forms over wiped paths.
       if ((this.fogFrame += ts) > 8) {
         this.fogFrame = 0;
-        const ctx = this.fogCtx;
-        ctx.fillStyle = 'rgba(0,0,0,0.035)';
-        ctx.fillRect(0, 0, this.fog.width, this.fog.height);
+        this.cmd.fogFade = Math.min(1, this.cmd.fogFade + 0.035);
       }
 
       // ---- physics ---------------------------------------------------------
@@ -352,18 +337,18 @@
       }
     }
 
-    /** Rasterize the current state into the water-map canvas. */
+    /** Build the drop instance list: [x, y, w, h, bucket, alpha] per sprite (top-left origin). */
     render() {
-      const ctx = this.waterCtx;
       const p = this.params;
-      ctx.clearRect(0, 0, this.width, this.height);
-      ctx.drawImage(this.droplets, 0, 0);
-      const sprites = this.dropSprites;
       const maxR = p.maxR * 1.3;
+      const need = this.drops.length * 2 * 6;
+      if (this.instances.length < need) this.instances = new Float32Array(need * 2);
+      const out = this.instances;
+      let n = 0;
+      const push = (x, y, w, h, b) => { out[n++] = x; out[n++] = y; out[n++] = w; out[n++] = h; out[n++] = b; out[n++] = 1; };
       for (let i = 0; i < this.drops.length; i++) {
         const d = this.drops[i];
         const bucket = Math.min(SIZE_BUCKETS - 1, Math.floor((d.r / maxR) * SIZE_BUCKETS));
-        const spr = sprites[bucket];
         const sx = 1 + d.spreadX * 0.6 - d.spreadY * 0.15;
         const sy = 1 + d.spreadY + d.spreadX * 0.2;
         const w = d.r * 2 * sx, h = d.r * 2 * sy;
@@ -371,12 +356,23 @@
         if (d.vy > 0.4 && d.r > p.moveR) {
           const nr = d.r * 0.62;
           const ny = d.y - d.r * 0.75 * sy;
-          ctx.drawImage(sprites[Math.max(0, bucket - 2)], d.x - nr, ny - nr * 1.3, nr * 2, nr * 2.6);
+          push(d.x - nr, ny - nr * 1.3, nr * 2, nr * 2.6, Math.max(0, bucket - 2));
         }
-        ctx.drawImage(spr, d.x - w / 2, d.y - h * 0.55, w, h);
+        push(d.x - w / 2, d.y - h * 0.55, w, h, bucket);
       }
+      this.instanceCount = n / 6;
     }
   }
+
+  /** Sprite atlas (SIZE_BUCKETS drops side by side) as raw RGBA for the GPU. */
+  function makeDropAtlas() {
+    const width = SPRITE * SIZE_BUCKETS, height = SPRITE;
+    const data = new Uint8Array(width * height * 4);
+    for (let i = 0; i < SIZE_BUCKETS; i++) writeDropSprite(data, width, i * SPRITE, 0.3 + 0.7 * (i / (SIZE_BUCKETS - 1)));
+    return { data, width, height };
+  }
+  RainSimulation.SIZE_BUCKETS = SIZE_BUCKETS;
+  RainSimulation.makeDropAtlas = makeDropAtlas;
 
   root.RainGlass = root.RainGlass || {};
   root.RainGlass.RainSimulation = RainSimulation;

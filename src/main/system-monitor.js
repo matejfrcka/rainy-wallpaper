@@ -7,7 +7,9 @@ const { powerMonitor } = require('electron');
 const win32 = require('./win32');
 
 class SystemMonitor {
-  constructor({ getSettings, getOwnHandles, onChange }) {
+  constructor({ getSettings, getOwnHandles, onChange, onCovered = () => {} }) {
+    this.onCovered = onCovered;
+    this.coveredKey = '';
     this.getSettings = getSettings;
     this.getOwnHandles = getOwnHandles;
     this.onChange = onChange;
@@ -30,8 +32,16 @@ class SystemMonitor {
 
   poll() {
     const s = this.getSettings();
-    const fs = s.pauseOnFullscreen ? win32.getFullscreenState(this.getOwnHandles()).fullscreen : false;
+    const own = this.getOwnHandles();
+    const fs = s.pauseOnFullscreen ? win32.getFullscreenState(own).fullscreen : false;
     this.set('fullscreen', fs);
+    // Monitors whose desktop is hidden by maximized windows: stop drawing there.
+    const covered = s.pauseWhenCovered ? win32.getCoveredMonitors(own) : [];
+    const key = covered.map((r) => `${r.x},${r.y}`).sort().join('|');
+    if (key !== this.coveredKey) {
+      this.coveredKey = key;
+      this.onCovered(covered);
+    }
   }
 
   set(key, value) {

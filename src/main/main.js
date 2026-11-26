@@ -6,7 +6,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell, screen, protocol } = require('electron');
 const { SettingsStore } = require('./settings-store');
 const { WallpaperManager } = require('./wallpaper-manager');
 const { SystemMonitor } = require('./system-monitor');
@@ -20,6 +20,11 @@ const startHidden = process.argv.includes('--hidden');
 // Rain sound must play without a click on the desktop.
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 app.setAppUserModelId('com.rainyglass.wallpaper');
+
+// rainmedia:// streams the current background video (Range requests, CORS for WebGL).
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'rainmedia', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
+]);
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -41,19 +46,43 @@ function log(msg) {
 
 /* ------------------------------------------------------- background image */
 
-/** Custom image wins; otherwise the current Windows wallpaper (if enabled). */
+/**
+ * Custom image/video wins (same on every monitor); otherwise the current
+ * Windows wallpaper – per monitor when Windows reports one for each.
+ * Returns { key, source, path (primary), name, displays: { [displayId]: path } }.
+ */
 function resolveImage() {
   const s = store.get();
+  const all = screen.getAllDisplays();
+  const primaryId = screen.getPrimaryDisplay().id;
+  const stamp = (p) => { try { const st = fs.statSync(p); return `${st.mtimeMs}|${st.size}`; } catch { return '0'; } };
   if (s.backgroundPath) {
-    let mtime = 0;
-    try { mtime = fs.statSync(s.backgroundPath).mtimeMs; } catch { /* ignore */ }
-    return { key: `custom|${s.backgroundPath}|${mtime}`, source: 'custom', path: s.backgroundPath, name: path.basename(s.backgroundPath) };
+    const displays = Object.fromEntries(all.map((d) => [d.id, s.backgroundPath]));
+    return { key: `custom|${s.backgroundPath}|${stamp(s.backgroundPath)}`, source: 'custom', path: s.backgroundPath, name: path.basename(s.backgroundPath), displays };
   }
   if (s.useSystemWallpaper) {
-    const found = images.findSystemWallpaper(require('./win32').getSystemWallpaperPath());
-    if (found) return { key: `windows|${found.path}|${found.mtime}|${found.size}`, source: 'windows', path: found.path, name: 'Windows wallpaper' };
+    const win32 = require('./win32');
+    const fallback = images.findSystemWallpaper(win32.getSystemWallpaperPath());
+    const perMonitor = win32.getMonitorWallpapers() || [];
+    const displays = {};
+    for (const d of all) {
+      const r = process.platform === 'win32' ? screen.dipToScreenRect(null, d.bounds) : d.bounds;
+      const m = perMonitor.find((x) => Math.abs(x.rect.x - r.x) < 2 && Math.abs(x.rect.y - r.y) < 2);
+      const own = m && m.path ? images.findSystemWallpaper(m.path) : null;
+      const pick = own || fallback;
+      if (pick) displays[d.id] = pick.path;
+    }
+    const primary = displays[primaryId] || (fallback && fallback.path);
+    if (primary) {
+      const key = 'windows|' + all.map((d) => `${d.id}:${displays[d.id]}:${stamp(displays[d.id])}`).join(',');
+      return { key, source: 'windows', path: primary, name: 'Windows wallpaper', displays };
+    }
   }
-  return { key: 'none', source: null, path: null, name: null };
+  return { key: 'none', source: null, path: null, name: null, displays: {} };
+}
+
+function imagePathFor(displayId) {
+  return (displayId && currentImage.displays[displayId]) || currentImage.path;
 }
 
 /** Settings as sent to renderers: plus which image is effectively shown. */
@@ -74,7 +103,33 @@ function refreshImage(force = false) {
 }
 
 function fullStatus() {
-  return { ...status, paused: wallpapers.paused, displays: wallpapers.displays(), enabled: wallpapers.enabled, attach: wallpapers.attach };
+  return { ...status, paused: wallpapers.paused, displays: wallpapers.displays(), enabled: wallpapers.enabled, attach: wallpapers.attach, metrics };
+}
+
+/* ------------------------------------------------------------ performance */
+
+const metrics = { cpu: 0, memMB: 0, gpu: '', fpsAvg: 0 };
+let fpsSamples = [];
+
+/** CPU / memory of all app processes every 5 s, written to the log every minute. */
+function startMetrics() {
+  app.getGPUInfo('complete').then((info) => {
+    const dev = (info.gpuDevice || []).find((d) => d.active) || (info.gpuDevice || [])[0] || {};
+    metrics.gpu = (info.auxAttributes && info.auxAttributes.glRenderer) || `${dev.vendorString || dev.vendorId || ''} ${dev.deviceString || dev.deviceId || ''}`.trim();
+    log(`gpu: ${metrics.gpu}`);
+  }).catch(() => {});
+  let tick = 0;
+  setInterval(() => {
+    const list = app.getAppMetrics();
+    metrics.cpu = Math.round(list.reduce((s, m) => s + (m.cpu ? m.cpu.percentCPUUsage : 0), 0) * 10) / 10;
+    metrics.memMB = Math.round(list.reduce((s, m) => s + (m.memory ? m.memory.workingSetSize : 0), 0) / 1024);
+    metrics.fpsAvg = fpsSamples.length ? Math.round(fpsSamples.reduce((a, b) => a + b, 0) / fpsSamples.length) : 0;
+    if (++tick % 12 === 0) {
+      log(`perf: fps=${metrics.fpsAvg} cpu=${metrics.cpu}% mem=${metrics.memMB}MB suspended=${status.suspended} covered=${[...wallpapers.covered].length}`);
+      fpsSamples = [];
+    }
+    sendToSettings('status:changed', fullStatus());
+  }, 5000);
 }
 
 function init() {
@@ -93,7 +148,9 @@ function init() {
       wallpapers.setSuspended(suspended);
       pushStatus();
     },
+    onCovered: (rects) => { wallpapers.setCovered(rects); pushStatus(); },
   });
+  startMetrics();
 
   // A missing image (moved / deleted) falls back to the neutral background.
   const s = store.get();
@@ -101,7 +158,20 @@ function init() {
     try { images.validate(s.backgroundPath); } catch { store.update({ backgroundPath: null }); }
   }
 
+  protocol.handle('rainmedia', (request) => {
+    try {
+      const id = new URL(request.url).pathname.replace(/^\//, '');
+      const file = imagePathFor(id === 'primary' ? null : Number(id));
+      if (!file) return new Response(null, { status: 404 });
+      return images.streamResponse(file, request);
+    } catch (e) {
+      return new Response(null, { status: 500 });
+    }
+  });
+
   currentImage = resolveImage();
+  screen.on('display-added', () => refreshImage());
+  screen.on('display-removed', () => refreshImage());
   log(`background: ${currentImage.source || 'gradient'} ${currentImage.path || ''}`);
   setInterval(() => refreshImage(), 10000);
 
@@ -258,11 +328,17 @@ function registerIpc() {
     return applySettings({ backgroundPath: file });
   });
   ipcMain.handle('image:remove', () => applySettings({ backgroundPath: null }));
-  ipcMain.handle('image:read', () => {
+  ipcMain.handle('image:read', (_e, displayId) => {
     const img = currentImage;
-    if (!img.path) return null;
-    const { data, mime } = images.readImage(img.path, img.source === 'windows');
-    return { data: new Uint8Array(data.buffer, data.byteOffset, data.byteLength), mime, name: img.name, path: img.path, source: img.source, key: img.key };
+    const file = imagePathFor(displayId);
+    if (!file) return null;
+    const meta = { name: img.name, path: file, source: img.source, key: img.key };
+    if (images.isVideo(file)) {
+      // Videos are streamed through rainmedia:// instead of copied over IPC.
+      return { ...meta, kind: 'video', mime: images.mimeOf(file), url: `rainmedia://media/${displayId || 'primary'}?k=${encodeURIComponent(img.key)}` };
+    }
+    const { data, mime } = images.readImage(file, img.source === 'windows');
+    return { ...meta, kind: 'image', mime, data: new Uint8Array(data.buffer, data.byteOffset, data.byteLength) };
   });
 
   ipcMain.handle('preset:save', (_e, name) => store.savePreset(name));
@@ -280,6 +356,7 @@ function registerIpc() {
   ipcMain.on('wallpaper:lightning', (e, distance) => wallpapers.relayLightning(e.sender.id, Number(distance) || 0.5));
   ipcMain.on('wallpaper:fps', (_e, fps) => {
     status.fps = Number(fps) || 0;
+    if (status.fps) fpsSamples.push(status.fps);
     sendToSettings('status:changed', fullStatus());
   });
   ipcMain.on('wallpaper:error', (_e, msg) => {
@@ -298,7 +375,8 @@ function registerIpc() {
     if (res.canceled || !res.filePaths.length) return null;
     const out = path.join(res.filePaths[0], 'RainyGlass');
     const s = store.get();
-    buildWallpaperEngineProject(out, s, currentImage.source === 'custom' ? currentImage.path : null);
+    const bundle = currentImage.source && currentImage.path && !images.isVideo(currentImage.path) ? currentImage.path : null;
+    buildWallpaperEngineProject(out, s, bundle);
     shell.openPath(out);
     return out;
   });

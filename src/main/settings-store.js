@@ -48,7 +48,7 @@ class SettingsStore {
 
   reset() {
     // Keep the chosen image and system options; reset the look.
-    const keep = ['backgroundPath', 'useSystemWallpaper', 'startWithWindows', 'wallpaperEnabled', 'pauseOnFullscreen', 'pauseOnBattery'];
+    const keep = ['backgroundPath', 'useSystemWallpaper', 'startWithWindows', 'wallpaperEnabled', 'pauseOnFullscreen', 'pauseOnBattery', 'pauseWhenCovered'];
     const next = { ...DEFAULT_SETTINGS };
     for (const k of keep) next[k] = this.settings[k];
     return this.update(next);

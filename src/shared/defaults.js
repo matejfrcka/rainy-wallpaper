@@ -52,6 +52,7 @@
     fpsLimit: 60,              // 30 | 60 | 144(0 = vsync)
     renderScale: 100,          // 50..100 % of physical resolution
     pauseOnFullscreen: true,
+    pauseWhenCovered: true,    // stop drawing on monitors hidden behind maximized windows
     pauseOnBattery: false,
     startWithWindows: false,
     wallpaperEnabled: true,

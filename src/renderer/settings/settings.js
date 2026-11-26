@@ -117,6 +117,7 @@
           toggle('wallpaperEnabled', 'Live wallpaper', { hint: 'Show the rain on your desktop (all monitors).' }),
           toggle('startWithWindows', 'Start with Windows'),
           toggle('pauseOnFullscreen', 'Pause when a fullscreen app or game runs'),
+          toggle('pauseWhenCovered', 'Pause on monitors covered by maximized windows', { hint: 'Saves GPU while you work; sound keeps playing.' }),
           toggle('pauseOnBattery', 'Pause on battery power'),
         ] },
         { title: 'Performance', items: [
@@ -157,11 +158,10 @@
     try {
       const img = await api.readImage();
       if (!img || previewKey !== key) return;
-      const blob = new Blob([img.data], { type: img.mime });
-      if (engine) await engine.setBackgroundFromBlob(blob);
+      if (engine) await engine.setBackgroundMedia(img);
       if (thumbUrl) URL.revokeObjectURL(thumbUrl);
-      thumbUrl = URL.createObjectURL(blob);
-      renderImageCard({ url: thumbUrl, name: img.name, path: img.path, source: img.source });
+      thumbUrl = img.kind === 'video' ? null : URL.createObjectURL(new Blob([img.data], { type: img.mime }));
+      renderImageCard({ url: thumbUrl || img.url, video: img.kind === 'video', name: img.name, path: img.path, source: img.source });
     } catch (e) {
       toast('This image could not be decoded: ' + e.message, true);
       if (settings.imageSource === 'custom') applyRemote(await api.removeImage());
@@ -258,7 +258,11 @@
   function renderImageCard(img) {
     imageCard.innerHTML = '';
     const thumb = h('div', { class: 'image-thumb', title: 'Click to choose an image', onclick: selectImage });
-    if (img) thumb.append(h('img', { src: img.url, alt: '' }));
+    if (img && img.video) {
+      const v = h('video', { src: img.url, muted: '', autoplay: '', loop: '', playsinline: '', crossorigin: 'anonymous' });
+      v.muted = true;
+      thumb.append(v);
+    } else if (img) thumb.append(h('img', { src: img.url, alt: '' }));
     else thumb.append(h('div', { class: 'empty' }, icon('upload'), 'Select or drop an image', h('span', { style: 'font-size:11px' }, state.formats.map((f) => f.toUpperCase()).join(' · '))));
     const custom = img && img.source === 'custom';
     const label = custom ? img.name
@@ -315,6 +319,7 @@
 
   /* ------------------------------------------------ custom: system extra */
   const monitorsBox = h('div');
+  const perfBox = h('div', { class: 'info-row', style: 'padding:6px 0 10px' });
   const MODES = { progman: 'Behind icons (Windows 11 24H2+)', classic: 'Behind icons (WorkerW)', failed: 'Failed – see log' };
   function renderMonitors() {
     monitorsBox.innerHTML = '';
@@ -322,11 +327,21 @@
     if (mode) monitorsBox.append(h('div', { class: 'row-hint', style: 'margin:4px 0 6px' }, 'Desktop mode: ' + (MODES[mode] || mode)));
     for (const d of status.displays || []) {
       monitorsBox.append(h('div', { class: 'monitor' }, icon('monitor'),
-        h('div', {}, h('b', {}, `${d.width} × ${d.height}`), ` · ${Math.round(d.scaleFactor * 100)}% · ${d.refreshRate} Hz${d.primary ? ' · Primary' : ''}`)));
+        h('div', {}, h('b', {}, `${d.width} × ${d.height}`), ` · ${Math.round(d.scaleFactor * 100)}% · ${d.refreshRate} Hz${d.primary ? ' · Primary' : ''}${d.covered ? ' · paused (covered)' : ''}`)));
+    }
+    const m = status.metrics;
+    if (m) {
+      perfBox.innerHTML = '';
+      perfBox.append(
+        h('span', { class: 'chip' }, 'Wallpaper FPS ', h('b', {}, String(status.fps || m.fpsAvg || '–'))),
+        h('span', { class: 'chip' }, 'CPU ', h('b', {}, m.cpu + ' %')),
+        h('span', { class: 'chip' }, 'RAM ', h('b', {}, m.memMB + ' MB')),
+        m.gpu ? h('span', { class: 'chip', title: m.gpu }, 'GPU ', h('b', {}, m.gpu.length > 38 ? m.gpu.slice(0, 38) + '…' : m.gpu)) : null);
     }
   }
   const systemExtra = h('div', {},
     h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, 'Monitors'), monitorsBox),
+    h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, 'Live performance'), perfBox),
     h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, 'Wallpaper Engine'),
       h('div', { class: 'row' },
         h('div', { class: 'row-hint', style: 'margin-bottom:10px' }, 'Export a web wallpaper project (with your image and current settings) that can be imported into Wallpaper Engine.'),
