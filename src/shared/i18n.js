@@ -160,7 +160,7 @@
     "Default": "Predvolený",
     "Clear": "Priehľadný",
     "Frosted": "Matný",
-    "Makes the taskbar see-through so the rain keeps running underneath it. Works best on Windows 10 and Windows 11 21H2; newer Windows 11 builds may partly ignore it.": "Spriehľadní panel úloh, takže dážď steká aj pod ním. Najlepšie funguje na Windows 10 a Windows 11 21H2; novšie verzie Windows 11 to môžu čiastočne ignorovať.",
+    "Makes the taskbar see-through so the rain keeps running underneath it.": "Sprehľadní panel úloh, takže dážď steká aj pod ním.", "Windows glass": "Sklo Windowsu", "On this Windows version apps can only switch the taskbar to Windows' own glass (transparency effects without accent colour). For a completely clear taskbar use TranslucentTB from the Microsoft Store and leave this on Default.": "V tejto verzii Windowsu môžu aplikácie prepnúť panel úloh len na sklo samotného Windowsu (efekty priehľadnosti bez zvýrazňujúcej farby). Pre úplne priehľadný panel použi TranslucentTB z Microsoft Store a tu nechaj Predvolený.",
     "White clock and icons on the taskbar": "Biele hodiny a ikony na paneli úloh",
     "Switches Windows to dark mode while the see-through taskbar is on and restores your setting afterwards.": "Kým je panel priehľadný, prepne Windows do tmavého režimu a potom vráti tvoje nastavenie.",
     "Photo resolution": "Rozlíšenie fotiek",

@@ -273,6 +273,11 @@ async function setGallery(ref, matchLook = store.get().galleryMatchLook) {
 
 /* --------------------------------------------------------------- taskbar */
 
+const WIN_BUILD = process.platform === 'win32' ? Number(require('os').release().split('.')[2] || 0) : 0;
+const BACKDROP_OK = WIN_BUILD >= 22621; // Windows 11 22H2+: glass for the Explorer top bar only
+// Windows 11 22H2+ draws the taskbar with XAML and ignores the accent policy
+// other apps can set; there the only safe option is Windows' own glass.
+const NEW_TASKBAR = WIN_BUILD >= 22621;
 let taskbarTimer = null;
 let taskbarActive = false;
 const PERSONALIZE = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize';
@@ -304,7 +309,7 @@ const regSetLightTheme = (v) => regSet('SystemUsesLightTheme', v);
 function syncStartTransparency(quitting = false) {
   if (process.platform !== 'win32') return;
   const s = store.get();
-  const want = s.startTransparent && !quitting;
+  const want = (s.startTransparent || (NEW_TASKBAR && s.taskbarStyle !== 'default')) && !quitting;
   if (want && s.startSavedTransparency < 0) {
     // Transparency effects on + no accent colour tint on Start/taskbar: the
     // neutral glass Windows then draws is the most see-through it offers.
@@ -350,12 +355,20 @@ function startTaskbar() {
     }
   }
   if (s.taskbarStyle === 'default') {
+    if (NEW_TASKBAR) syncStartTransparency();
     if (taskbarActive) win32.restoreTaskbar();
     taskbarActive = false;
     log('taskbar: Windows default');
     return;
   }
   taskbarActive = true;
+  if (NEW_TASKBAR) {
+    // Windows' own glass (transparency effects, no accent tint) – see syncStartTransparency.
+    syncStartTransparency();
+    if (wantLight) win32.restoreTaskbar();
+    log(`taskbar: Windows glass${wantLight ? ' + light icons' : ''} (build ${WIN_BUILD})`);
+    return;
+  }
   if (wantLight) win32.restoreTaskbar(); // let Explorer pick up the dark theme first
   const n = win32.setTaskbarStyle(s.taskbarStyle);
   log(`taskbar: ${s.taskbarStyle}${wantLight ? ' + light icons' : ''} (${n} taskbar${n === 1 ? '' : 's'})`);
@@ -376,8 +389,6 @@ function stopTaskbar() {
 /* ------------------------------------------------ glass Explorer windows */
 
 let explorerTimer = null;
-const WIN_BUILD = process.platform === 'win32' ? Number(require('os').release().split('.')[2] || 0) : 0;
-const BACKDROP_OK = WIN_BUILD >= 22621; // Windows 11 22H2+: glass for the top bar only
 function syncExplorerGlass(quitting = false) {
   clearInterval(explorerTimer);
   explorerTimer = null;

@@ -165,7 +165,10 @@
           toggle('pauseOnFullscreen', t('Pause when a fullscreen app or game runs')),
           toggle('pauseWhenCovered', t('Pause on monitors covered by maximized windows'), { hint: t('Saves GPU while you work; sound keeps playing.') }),
           toggle('pauseOnBattery', t('Pause on battery power')),
-          seg('taskbarStyle', t('Taskbar'), [['default', t('Default')], ['clear', t('Clear')], ['blur', t('Blur')], ['acrylic', t('Frosted')]], { hint: t('Makes the taskbar see-through so the rain keeps running underneath it. Works best on Windows 10 and Windows 11 21H2; newer Windows 11 builds may partly ignore it.') }),
+          state.winBuild >= 22621
+            // Windows 11 22H2+: only Windows' own glass is possible without hooking into Explorer.
+            ? seg('taskbarStyle', t('Taskbar'), [['default', t('Default')], ['acrylic', t('Windows glass')]], { hint: t('On this Windows version apps can only switch the taskbar to Windows\' own glass (transparency effects without accent colour). For a completely clear taskbar use TranslucentTB from the Microsoft Store and leave this on Default.') })
+            : seg('taskbarStyle', t('Taskbar'), [['default', t('Default')], ['clear', t('Clear')], ['blur', t('Blur')], ['acrylic', t('Frosted')]], { hint: t('Makes the taskbar see-through so the rain keeps running underneath it.') }),
           toggle('taskbarLightIcons', t('White clock and icons on the taskbar'), { dependsOn: (st) => st.taskbarStyle !== 'default', hint: t('Switches Windows to dark mode while the see-through taskbar is on and restores your setting afterwards.') }),
           seg('explorerGlass', t('Folder windows top bar'), [['off', t('Default')], ['acrylic', t('Glass')], ['mica', 'Mica']], {
             dependsOn: () => state.winBuild >= 22621, // greyed out where Windows can't do it
