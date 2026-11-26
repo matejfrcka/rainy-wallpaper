@@ -129,7 +129,9 @@
       groups: [
         { title: t('Desktop'), items: [
           toggle('wallpaperEnabled', t('Live wallpaper'), { hint: t('Show the rain on your desktop (all monitors).') }),
-          toggle('startWithWindows', t('Start with Windows')),
+          state.store
+            ? toggle('startWithWindows', t('Start with Windows'), { hint: t('Microsoft Store version: turn on "Rainy Glass" in Task Manager → Startup apps.'), disabled: true })
+            : toggle('startWithWindows', t('Start with Windows')),
           toggle('pauseOnFullscreen', t('Pause when a fullscreen app or game runs')),
           toggle('pauseWhenCovered', t('Pause on monitors covered by maximized windows'), { hint: t('Saves GPU while you work; sound keeps playing.') }),
           toggle('pauseOnBattery', t('Pause on battery power')),
@@ -220,9 +222,9 @@
 
   function refreshDependencies() {
     for (const sec of SECTIONS) for (const g of sec.groups) for (const it of g.items) {
-      if (!it.dependsOn && !it.disabledBy) continue;
+      if (!it.dependsOn && !it.disabledBy && !it.disabled) continue;
       const c = controls.get(it.key);
-      const off = (it.dependsOn && !settings[it.dependsOn]) || (it.disabledBy && settings[it.disabledBy]);
+      const off = it.disabled || (it.dependsOn && !settings[it.dependsOn]) || (it.disabledBy && settings[it.disabledBy]);
       if (c) c.row.classList.toggle('disabled', !!off);
     }
   }

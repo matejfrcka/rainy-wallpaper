@@ -20,7 +20,9 @@ const win32 = require('./win32');
 
 const PRELOAD = path.join(__dirname, '..', 'preload', 'preload.js');
 const ASSETS = path.join(__dirname, '..', '..', 'assets');
-const startHidden = process.argv.includes('--hidden');
+const isStore = !!process.windowsStore;
+// Store build: the MSIX startup task can't pass --hidden, so a launch right after login starts in the tray.
+const startHidden = process.argv.includes('--hidden') || (isStore && os.uptime() < 240);
 
 // Rain sound must play without a click on the desktop.
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
@@ -351,6 +353,7 @@ function updateTrayMenu() {
 /* ----------------------------------------------------------------- settings */
 
 function applyLoginItem(enabled) {
+  if (isStore) return; // MSIX: controlled by the startup task (Task Manager → Startup apps)
   if (process.platform !== 'win32' && process.platform !== 'darwin') return;
   try {
     app.setLoginItemSettings({ openAtLogin: !!enabled, args: ['--hidden'] });
@@ -414,6 +417,7 @@ function registerIpc() {
     status: fullStatus(),
     version: app.getVersion(),
     lang: i18n.language,
+    store: isStore,
     platform: process.platform,
     formats: images.EXTENSIONS,
   }));

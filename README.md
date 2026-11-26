@@ -18,6 +18,17 @@ The app has two separate layers:
 - **Desktop integration**: the wallpaper sits behind the desktop icons (WorkerW technique, including the Windows 11 24H2 layout). It supports multiple monitors with different resolutions and DPI. It rebuilds itself after monitor changes or an Explorer restart. It can start with Windows and has a tray menu.
 - **Resource use**: the wallpaper sleeps (no rendering, sound muted) while a fullscreen app or game is running, when the screen is locked, while the PC sleeps, and optionally on battery. You can also set an FPS limit (30, 60 or Max) and a render resolution (50–100 %) for 4K screens.
 - **Wallpaper Engine export**: creates a web wallpaper project that has the same engine and options, including a property for choosing the image.
+- **Backgrounds**: your current Windows wallpaper is used automatically, and each monitor gets its own wallpaper. A custom image, an animated GIF/WebP or a video (MP4/WEBM, streamed from disk) can override it.
+- **GPU rendering**: the water map (drops, droplets, wipes, condensation) is drawn on the GPU with instanced sprites. Only the cheap drop physics runs on the CPU.
+- **Covered monitors**: drawing stops on monitors hidden behind maximized windows. The sound keeps playing.
+- **Mouse interaction**: moving the cursor over the desktop wipes the condensation and droplets, like a finger on a fogged window.
+- **Live weather**: rain intensity, thunder, wind and fog can follow the real weather in your city (Open-Meteo, no API key), updated every 15 minutes.
+- **Automatic day/night**: the color grading follows the sun's elevation at your location.
+- **Soundscapes**: window, tin roof, leaves or car, plus optional wind.
+- **Preset gallery**: every preset shows a preview rendered over your own background. Presets can be exported and imported as `.json` files.
+- **Languages**: English and Slovak (automatic from the system or chosen in *System*).
+- **Global shortcuts**: Ctrl+Alt+R pauses or resumes the rain, Ctrl+Alt+W turns the wallpaper on or off, Ctrl+Alt+S opens the settings.
+- **Automatic updates** from GitHub Releases (installed version). **Live performance** stats (FPS, CPU, RAM, GPU) are shown in *System* and written to the log.
 
 ## Architecture
 
@@ -87,6 +98,50 @@ The output goes to `dist/`:
 
 `npm run build:dir` creates an unpacked build in `dist/win-unpacked/` for quick testing.
 
+## Distribution: making the app run for everyone
+
+Windows Smart App Control and SmartScreen block unsigned apps. There are two ways to avoid that.
+
+### A) Microsoft Store (recommended)
+
+Microsoft signs the package, so Smart App Control trusts it, and users get updates through the Store.
+
+1. Create a developer account at https://partner.microsoft.com/dashboard. Reserve the app name.
+2. Open **Product identity** and copy *Package/Identity/Name*, *Publisher* (`CN=…`) and *Publisher display name*.
+3. Build the MSIX on Windows:
+   ```bash
+   npm run build:store -- -c.appx.identityName="<Name>" -c.appx.publisher="CN=<…>" -c.appx.publisherDisplayName="<Display name>"
+   ```
+   Or set the repository variables `APPX_IDENTITY_NAME`, `APPX_PUBLISHER` and `APPX_PUBLISHER_DISPLAY_NAME`, and the GitHub Actions workflow builds it for you.
+4. Upload `dist/*.appx` in Partner Center (Packages), then fill in the listing and submit it for certification.
+
+In the Store build, starting with Windows is controlled by Windows: *Task Manager → Startup apps → Rainy Glass*. Updates come from the Store.
+
+### B) Signed installer (code-signing certificate)
+
+1. Buy a code-signing certificate, for example Certum (an open-source developer certificate is the cheapest option for individuals), Sectigo or SSL.com. Azure Trusted Signing is another option.
+2. Local build:
+   ```bash
+   set CSC_LINK=C:\path\cert.pfx
+   set CSC_KEY_PASSWORD=****
+   npm run build
+   ```
+   For CI: add the repository secrets `WIN_CSC_LINK` (base64 of the .pfx) and `WIN_CSC_KEY_PASSWORD`.
+3. Certificates stored on a USB token or in a cloud HSM use `win.signtoolOptions` or `win.azureSignOptions` in `package.json`. See the [electron-builder code signing docs](https://www.electron.build/code-signing-win).
+
+SmartScreen can still show a warning until the app builds up reputation (downloads).
+
+### Releases and automatic updates
+
+Push a tag to build and publish a GitHub Release. The installed app downloads updates from it automatically:
+
+```bash
+git tag v1.1.0
+git push origin v1.1.0
+```
+
+Auto-update needs a **public** repository, or a token configured for electron-updater. The portable `.exe` does not auto-update.
+
 ## Wallpaper Engine
 
 You have two options:
@@ -115,7 +170,7 @@ This checks settings sanitizing, the preset store and the Wallpaper Engine expor
 
 ## Troubleshooting
 
-- **The wallpaper shows in front of windows, or does not show at all**: the attach to the desktop failed. This can happen with a custom shell or an unusual Explorer build. Restart the app. The app falls back to keeping its window at the bottom of the window stack.
+- **The rain is not visible on the desktop**: the app could not place the wallpaper behind the icons. It never covers the icons; instead the status shows *Desktop attach failed*. Send the log: *System → Open log file*.
 - **A black desktop after a crash**: change your wallpaper once in Windows Settings, or start and quit the app again.
 - **Low FPS**: lower *Render resolution*, *Droplet density* or *Rain intensity*. Make sure the app runs on your dedicated GPU (Windows Settings → Display → Graphics).
 

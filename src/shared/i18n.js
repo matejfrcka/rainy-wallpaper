@@ -97,6 +97,7 @@
     'Restart to update': 'Reštartovať a aktualizovať', 'Automatic updates work in the installed version.': 'Automatické aktualizácie fungujú v nainštalovanej verzii.',
     'Checking for updates…': 'Hľadám aktualizácie…', 'You have the latest version.': 'Máš najnovšiu verziu.', 'Downloading update': 'Sťahujem aktualizáciu',
     'Update ready': 'Aktualizácia pripravená', 'Update failed': 'Aktualizácia zlyhala',
+    'Microsoft Store version: turn on "Rainy Glass" in Task Manager → Startup apps.': 'Verzia z Microsoft Store: zapni „Rainy Glass“ v Správcovi úloh → Aplikácie pri spustení.',
     'Open Settings': 'Otvoriť nastavenia', 'Change background…': 'Zmeniť pozadie…', 'Quit': 'Ukončiť',
   };
 
