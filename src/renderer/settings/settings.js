@@ -69,13 +69,22 @@
     {
       id: 'rain', title: t('Rain'), lead: t('Physics of the water on the glass.'),
       groups: [
-        { title: t('Amount'), items: [
-          seg('precipitation', t('Weather'), [['rain', t('Rain')], ['snow', t('Snow')]]),
+        { title: t('Weather'), items: [
+          seg('precipitation', t('Weather'), [['rain', t('Rain')], ['snow', t('Snow')]], { hint: t('Snow shows its own settings below.') }),
+        ] },
+        { title: t('Snow'), showIf: (st) => st.precipitation === 'snow', items: [
+          slider('snowIntensity', t('Snow intensity'), { hint: t('How much snow sticks to the glass.') }),
+          slider('flakeSize', t('Flake size')),
+          slider('snowMelt', t('Melting speed'), { hint: t('How fast the snow on the glass melts away.') }),
+          slider('snowFall', t('Falling snow outside'), { hint: t('Snowflakes falling behind the window. 0 = off.') }),
+          slider('frost', t('Frost'), { hint: t('Ice crystals grow from the window frame. Wipe them with the mouse.') }),
+        ] },
+        { title: t('Amount'), showIf: (st) => st.precipitation !== 'snow', items: [
           slider('rainIntensity', t('Rain intensity'), { hint: t('How often new drops hit the window.') }),
           slider('dropletDensity', t('Droplet density'), { hint: t('Tiny static droplets covering the glass.') }),
           slider('dropletSize', t('Droplet size')),
         ] },
-        { title: t('Motion'), items: [
+        { title: t('Motion'), showIf: (st) => st.precipitation !== 'snow', items: [
           slider('dropletSpeed', t('Droplet speed')),
           slider('trailLength', t('Water trail length')),
           toggle('merging', t('Droplet merging'), { hint: t('Drops that touch combine into larger, faster drops.') }),
@@ -102,7 +111,6 @@
           slider('condensation', t('Condensation intensity'), { dependsOn: 'condensationEnabled' }),
           toggle('streaksEnabled', t('Rain streaks'), { hint: t('Out-of-focus rain falling outside.') }),
           slider('streaks', t('Streak intensity'), { dependsOn: 'streaksEnabled' }),
-          slider('frost', t('Frost'), { hint: t('Ice crystals grow from the window frame. Wipe them with the mouse.') }),
         ] },
       ],
     },
@@ -232,6 +240,10 @@
   }
 
   function refreshDependencies() {
+    // Groups shown only for one weather type (rain / snow).
+    for (const sec of SECTIONS) for (const g of sec.groups) {
+      if (g.showIf && g.__el) g.__el.style.display = g.showIf(settings) ? '' : 'none';
+    }
     for (const sec of SECTIONS) for (const g of sec.groups) for (const it of g.items) {
       if (!it.dependsOn && !it.disabledBy && !it.disabled) continue;
       const c = controls.get(it.key);
@@ -606,7 +618,10 @@
     const el = h('section', { class: 'section', 'data-id': sec.id }, h('h2', {}, sec.title), h('p', { class: 'lead' }, sec.lead));
     if (sec.custom === 'image') el.append(imageCard, galleryBox);
     if (sec.custom === 'presets') el.append(scheduleBox, presetBox);
-    for (const g of sec.groups) el.append(h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, g.title), g.items.map(buildControl)));
+    for (const g of sec.groups) {
+      g.__el = h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, g.title), g.items.map(buildControl));
+      el.append(g.__el);
+    }
     if (sec.custom === 'system') el.append(systemExtra);
     if (sec.custom === 'weather') el.append(sleepBox, weatherBox);
     panel.append(el);

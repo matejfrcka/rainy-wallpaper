@@ -77,7 +77,7 @@
         this.audio.setOptions({
           enabled: !!this.settings.soundEnabled,
           volume: (this.settings.volume ?? 50) / 100,
-          intensity: ((this.settings.rainIntensity ?? 50) / 100) * (this.settings.precipitation === 'snow' ? 0.25 : 1),
+          intensity: this.settings.precipitation === 'snow' ? ((this.settings.snowIntensity ?? 50) / 100) * 0.25 : (this.settings.rainIntensity ?? 50) / 100,
           soundscape: this.settings.soundscape,
           wind: !!this.settings.windEnabled,
           windVolume: (this.settings.windVolume ?? 40) / 100,

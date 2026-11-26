@@ -113,6 +113,10 @@
     'This animated background is not available yet.': 'Toto animované pozadie zatiaľ nie je k dispozícii.',
     'Forest Cabin': 'Chatka v lese', 'Old Town at Night': 'Staré mesto v noci', 'Reading Nook': 'Kútik na čítanie', 'Misty Lake': 'Hmlisté jazero',
     'Autumn Park': 'Jesenný park', 'Snowy Village': 'Zasnežená dedinka', 'Tokyo Alley': 'Tokijská ulička', 'Stormy Lighthouse': 'Maják v búrke',
+    'Snow shows its own settings below.': 'Pri snehu sa nižšie zobrazia nastavenia snehu.', 'Snow intensity': 'Intenzita snehu',
+    'How much snow sticks to the glass.': 'Koľko snehu sa nalepí na sklo.', 'Flake size': 'Veľkosť vločiek', 'Melting speed': 'Rýchlosť topenia',
+    'How fast the snow on the glass melts away.': 'Ako rýchlo sa sneh na skle roztopí.', 'Falling snow outside': 'Padajúci sneh vonku',
+    'Snowflakes falling behind the window. 0 = off.': 'Vločky padajúce za oknom. 0 = vypnuté.',
     'Open Settings': 'Otvoriť nastavenia', 'Change background…': 'Zmeniť pozadie…', 'Quit': 'Ukončiť',
   };
 

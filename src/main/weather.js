@@ -51,10 +51,10 @@ function toSettings(w) {
   else if (drizzle) intensity = 18;
   else intensity = w.cloud > 80 ? 8 : 4; // just a wet window
   const snow = (code >= 71 && code <= 77) || code === 85 || code === 86;
-  if (snow) intensity = Math.min(100, 25 + w.precip * 25);
   const out = {
     rainIntensity: Math.round(intensity), thunderEnabled: thunder, windEnabled: w.wind > 25,
     precipitation: snow ? 'snow' : 'rain',
+    ...(snow ? { snowIntensity: Math.min(100, Math.round(30 + w.precip * 25)), rainIntensity: 15 } : {}),
     frost: w.temp <= -2 ? Math.min(80, Math.round(-w.temp * 8)) : 0,
   };
   if (fog) Object.assign(out, { condensationEnabled: true, condensation: 75 });
