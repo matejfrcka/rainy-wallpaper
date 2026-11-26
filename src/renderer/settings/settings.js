@@ -623,13 +623,13 @@
   function renderWeather() {
     cityInput.placeholder = settings.weatherCity || t('City, e.g. Bratislava');
     const w = status.weather;
-    weatherInfo.textContent = !settings.weatherCity ? t('Rain intensity and thunder follow the real weather at your location (Open-Meteo).')
+    weatherInfo.textContent = !settings.weatherCity ? t('Rain, snow and thunder follow the real weather at your location (Open-Meteo).')
       : w && w.error ? `${settings.weatherCity}: ${w.error}`
       : w && w.text ? `${settings.weatherCity}: ${w.text}, ${Math.round(w.temp)} °C, ${w.precip} mm/h · ${t('updated')} ${new Date(w.time).toLocaleTimeString()}`
       : settings.weatherCity;
   }
   const weatherBox = h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, t('Live weather')),
-    buildControl(toggle('weatherSync', t('Sync rain with real weather'), { hint: t('Updates every 10 minutes: rain, snow, thunder, fog and wind follow the real weather. Manual changes are overwritten on the next update.') })),
+    buildControl(toggle('weatherSync', t('Sync rain and snow with real weather'), { hint: t('Updates every 10 minutes: rain, snow, thunder, fog and wind follow the real weather. Manual changes are overwritten on the next update.') })),
     h('div', { class: 'row' }, h('div', { class: 'preset-save' }, cityInput, h('button', { class: 'btn primary', onclick: searchWeather }, t('Set location'))), weatherInfo));
   renderWeather();
 

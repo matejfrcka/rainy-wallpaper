@@ -5,7 +5,7 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { DEFAULT_SETTINGS, PRESET_KEYS, BUILTIN_PRESETS, sanitize } = require('../shared/defaults');
+const { DEFAULT_SETTINGS, PRESET_KEYS, MODE_KEYS, BUILTIN_PRESETS, sanitize } = require('../shared/defaults');
 
 class SettingsStore {
   constructor(dir) {
@@ -51,12 +51,29 @@ class SettingsStore {
 
   /** Merge a partial update; returns { settings, changed: string[] }. */
   update(partial) {
+    partial = this.switchMode(partial);
     const next = sanitize({ ...this.settings, ...partial });
     const same = (a, b) => a === b || (typeof a === 'object' && a !== null && JSON.stringify(a) === JSON.stringify(b));
     const changed = Object.keys(next).filter((k) => !same(next[k], this.settings[k]));
     this.settings = next;
     if (changed.length) this.scheduleSave();
     return { settings: this.get(), changed };
+  }
+
+  /**
+   * Toggling rain ↔ snow on its own: remember the current look for the old
+   * mode and bring back the one used last time in the new mode (rain falls
+   * back to the default rain look), so snow settings don't leak into rain.
+   */
+  switchMode(partial) {
+    const keys = Object.keys(partial || {});
+    const to = partial && partial.precipitation;
+    const from = this.settings.precipitation;
+    if (keys.length !== 1 || !to || to === from) return partial;
+    const looks = { ...(this.settings.modeLooks || {}) };
+    looks[from] = Object.fromEntries(MODE_KEYS.map((k) => [k, this.settings[k]]));
+    const saved = looks[to] || (to === 'rain' ? Object.fromEntries(MODE_KEYS.map((k) => [k, DEFAULT_SETTINGS[k]])) : {});
+    return { ...saved, precipitation: to, modeLooks: looks };
   }
 
   reset() {

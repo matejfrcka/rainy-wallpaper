@@ -38,6 +38,8 @@
   "Live performance": "Výkon živě",
   "Wallpaper Engine": "Wallpaper Engine",
   "Diagnostics": "Diagnostika",
+  "Sync rain and snow with real weather": "Déšť a sníh podle skutečného počasí",
+  "Rain, snow and thunder follow the real weather at your location (Open-Meteo).": "Déšť, sníh a bouřky se řídí skutečným počasím ve tvé lokalitě (Open-Meteo).",
   "Live weather": "Počasí živě",
   "Library": "Knihovna",
   "Save current look": "Uložit aktuální vzhled",

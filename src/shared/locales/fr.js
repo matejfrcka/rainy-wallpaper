@@ -38,6 +38,8 @@
   "Live performance": "Performances en direct",
   "Wallpaper Engine": "Wallpaper Engine",
   "Diagnostics": "Diagnostic",
+  "Sync rain and snow with real weather": "Synchroniser pluie et neige avec la météo réelle",
+  "Rain, snow and thunder follow the real weather at your location (Open-Meteo).": "La pluie, la neige et l’orage suivent la météo réelle de ton lieu (Open-Meteo).",
   "Live weather": "Météo en direct",
   "Library": "Bibliothèque",
   "Save current look": "Enregistrer l'ambiance actuelle",

@@ -659,7 +659,9 @@ function applySettings(partial, origin) {
   wallpapers.broadcast('settings:changed', settings, changed);
   if (screensaver) screensaver.broadcast('settings:changed', settings, changed);
   // The settings window needs the echo when the effective image changed.
-  if (!origin || origin !== (settingsWin && settingsWin.webContents) || prevKey !== currentImage.key) sendToSettings('settings:changed', settings, changed);
+  // …and when the store changed more than was asked (rain ↔ snow restores that mode's look).
+  const extra = changed.some((k) => k !== 'modeLooks' && !(k in partial));
+  if (!origin || origin !== (settingsWin && settingsWin.webContents) || prevKey !== currentImage.key || extra) sendToSettings('settings:changed', settings, changed);
   if (changed.includes('startWithWindows')) applyLoginItem(settings.startWithWindows);
   if (changed.includes('wallpaperEnabled')) {
     if (settings.wallpaperEnabled) wallpapers.enable();

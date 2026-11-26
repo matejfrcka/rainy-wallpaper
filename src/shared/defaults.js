@@ -77,6 +77,7 @@
     pauseOnBattery: false,
     startWithWindows: false,
     wallpaperEnabled: true,
+    modeLooks: {},             // rain / snow look remembered when switching between them
     settingsVersion: 3,        // bumped when defaults change (one-time migrations)
     screensaverEnabled: false, // rain screensaver after inactivity
     screensaverMinutes: 10,
@@ -138,6 +139,9 @@
     'snowIntensity', 'flakeSize', 'snowMelt', 'snowFall',
   ];
 
+  // Look values that differ between rain and snow; remembered per mode when the user switches.
+  const MODE_KEYS = ['rainIntensity', 'dropletDensity', 'dropletSize', 'dropletSpeed', 'trailLength', 'condensation', 'streaks', 'frost', 'windEnabled'];
+
   const BUILTIN_PRESETS = [
     { name: 'Gentle Drizzle', builtin: true, values: { rainIntensity: 25, dropletDensity: 70, dropletSize: 15, dropletSpeed: 35, trailLength: 35, condensation: 20, streaks: 15, thunderEnabled: false, dayNight: 55 } },
     { name: 'Steady Rain', builtin: true, values: { rainIntensity: 55, dropletDensity: 60, dropletSize: 20, dropletSpeed: 50, trailLength: 50, condensation: 35, streaks: 35, thunderEnabled: false, dayNight: 50 } },
@@ -165,6 +169,15 @@
       const val = input[key];
       if (key === 'backgroundPath') out[key] = typeof val === 'string' && val.length ? val : null;
       else if (key === 'schedule') out[key] = sanitizeSchedule(val);
+      else if (key === 'modeLooks') {
+        out[key] = {};
+        for (const m of ['rain', 'snow']) {
+          if (!val || typeof val[m] !== 'object' || !val[m]) continue;
+          const clean = sanitize(val[m]);
+          out[key][m] = {};
+          for (const k of MODE_KEYS) if (k in val[m]) out[key][m][k] = clean[k];
+        }
+      }
       else if (ENUMS[key]) out[key] = ENUMS[key].includes(val) ? val : def;
       else if (STRINGS[key]) out[key] = typeof val === 'string' ? val.slice(0, STRINGS[key]) : def;
       else if (typeof def === 'boolean') out[key] = Boolean(val);
@@ -173,5 +186,5 @@
     return out;
   }
 
-  return { DEFAULT_SETTINGS, RANGES, ENUMS, STRINGS, PRESET_KEYS, BUILTIN_PRESETS, sanitize };
+  return { DEFAULT_SETTINGS, RANGES, ENUMS, STRINGS, PRESET_KEYS, MODE_KEYS, BUILTIN_PRESETS, sanitize };
 });

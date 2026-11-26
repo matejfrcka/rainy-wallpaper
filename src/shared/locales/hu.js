@@ -38,6 +38,8 @@
   "Live performance": "Élő teljesítmény",
   "Wallpaper Engine": "Wallpaper Engine",
   "Diagnostics": "Diagnosztika",
+  "Sync rain and snow with real weather": "Eső és hó a valódi időjárás szerint",
+  "Rain, snow and thunder follow the real weather at your location (Open-Meteo).": "Az eső, a hó és a zivatar a tartózkodási helyed valódi időjárását követi (Open-Meteo).",
   "Live weather": "Élő időjárás",
   "Library": "Könyvtár",
   "Save current look": "Jelenlegi kinézet mentése",

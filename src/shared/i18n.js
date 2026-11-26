@@ -25,6 +25,7 @@
     'Source': 'Zdroj', 'Layout': 'Rozloženie', 'Adjustments': 'Úpravy', 'Amount': 'Množstvo', 'Motion': 'Pohyb', 'Interaction': 'Interakcia',
     'Optics': 'Optika', 'Surface': 'Povrch', 'Sound': 'Zvuk', 'Color': 'Farby', 'Desktop': 'Plocha', 'Performance': 'Výkon',
     'Monitors': 'Monitory', 'Live performance': 'Výkon naživo', 'Wallpaper Engine': 'Wallpaper Engine', 'Diagnostics': 'Diagnostika',
+    'Sync rain and snow with real weather': 'Dážď a sneh podľa skutočného počasia', 'Rain, snow and thunder follow the real weather at your location (Open-Meteo).': 'Dážď, sneh a búrky sa riadia skutočným počasím v tvojej lokalite (Open-Meteo).',
     'Live weather': 'Počasie naživo', 'Library': 'Knižnica', 'Save current look': 'Uložiť aktuálny vzhľad', 'Keyboard shortcuts': 'Klávesové skratky',
     'Updates': 'Aktualizácie', 'Language': 'Jazyk',
     // background

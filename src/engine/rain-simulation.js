@@ -105,7 +105,9 @@
       p.merging = s.merging !== undefined ? !!s.merging : true;
       p.randomGen = s.randomGeneration !== undefined ? !!s.randomGeneration : true;
       p.condensation = (s.condensationEnabled === false) ? 0 : v('condensation', 35);
+      const wasSnow = p.snow;
       p.snow = s.precipitation === 'snow';
+      if (wasSnow && !p.snow) this.meltAll = 45; // switched to rain: snow on the glass disappears within ~¾ s
       p.snowIntensity = v('snowIntensity', 50);
       p.flakeSize = v('flakeSize', 40);
       p.snowMelt = v('snowMelt', 30);
@@ -236,6 +238,10 @@
         const fr = p.snowIntensity * p.snowIntensity * 6 * ts * (this.width * this.height) / (960 * 540);
         let f = Math.floor(fr) + (chance(fr % 1) ? 1 : 0);
         while (f-- > 0) this.spawnFlake();
+      }
+      if (this.meltAll > 0) {
+        this.meltAll -= ts;
+        this.cmd.snowFade = Math.max(this.cmd.snowFade, 0.12);
       }
       // Snow slowly melts away.
       if ((this.snowFrame += ts) > 30) {
