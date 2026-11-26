@@ -27,6 +27,7 @@
     'Monitors': 'Monitory', 'Live performance': 'Výkon naživo', 'Wallpaper Engine': 'Wallpaper Engine', 'Diagnostics': 'Diagnostika',
     'Sync rain and snow with real weather': 'Dážď a sneh podľa skutočného počasia', 'Rain, snow and thunder follow the real weather at your location (Open-Meteo).': 'Dážď, sneh a búrky sa riadia skutočným počasím v tvojej lokalite (Open-Meteo).',
     "See-through Start menu": "Priehľadná ponuka Štart", "Turns on Windows' transparency effects so Start, the taskbar and its flyouts use blurred glass. Your setting is restored when you switch this off or close the app.": "Zapne efekty priehľadnosti Windowsu, takže Štart, panel úloh a jeho okná budú z rozmazaného skla. Po vypnutí alebo zatvorení aplikácie sa vráti tvoje nastavenie.",
+    "Folder windows": "Okná priečinkov", "Mica": "Mica", "Glass top bar (title, Cut, Sort, View) in File Explorer windows; Glass lets the rain show through. Windows 11 22H2 or newer.": "Sklenený horný pruh (názov, Vystrihnúť, Zoradiť, Zobraziť) v oknách Prieskumníka; pri Skle presvitá dážď. Windows 11 22H2 alebo novší.",
     'Live weather': 'Počasie naživo', 'Library': 'Knižnica', 'Save current look': 'Uložiť aktuálny vzhľad', 'Keyboard shortcuts': 'Klávesové skratky',
     'Updates': 'Aktualizácie', 'Language': 'Jazyk',
     // background

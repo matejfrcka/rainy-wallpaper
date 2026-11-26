@@ -69,6 +69,7 @@ function load() {
       IsIconic: user32.func('bool __stdcall IsIconic(intptr_t hwnd)'),
       IsZoomed: user32.func('bool __stdcall IsZoomed(intptr_t hwnd)'),
       GetWindowTextLengthW: user32.func('int __stdcall GetWindowTextLengthW(intptr_t hwnd)'),
+      DwmSetWindowAttribute: dwmapi.func('int32 __stdcall DwmSetWindowAttribute(intptr_t hwnd, uint32 attr, _In_ int32 *value, uint32 size)'),
       DwmGetWindowAttribute: dwmapi.func('int32 __stdcall DwmGetWindowAttribute(intptr_t hwnd, uint32 attr, _Out_ int32 *value, uint32 size)'),
       CoInitializeEx: ole32.func('int32 __stdcall CoInitializeEx(void *reserved, uint32 flags)'),
       CoCreateInstance: ole32.func('int32 __stdcall CoCreateInstance(GUID *clsid, void *outer, uint32 ctx, GUID *iid, _Out_ void **ppv)'),
@@ -402,6 +403,37 @@ function setTaskbarStyle(style) {
 }
 
 /**
+ * Glass title and command bar for File Explorer windows (Windows 11 22H2+):
+ * sets the DWM system backdrop. 'acrylic' blurs what is behind the window
+ * (the rain), 'mica' tints it with the wallpaper, 'off' gives the window back
+ * to Windows. Already handled windows are skipped.
+ */
+const explorerApplied = new Map(); // hwnd -> backdrop value
+const BACKDROPS = { off: 0 /* auto */, mica: 2, acrylic: 3 };
+function setExplorerBackdrop(style) {
+  const a = load();
+  if (!a) return 0;
+  const value = BACKDROPS[style] ?? 0;
+  try {
+    const seen = new Set();
+    a.EnumWindows((hwnd) => {
+      if (className(a, hwnd) !== 'CabinetWClass') return true;
+      const key = Number(hwnd);
+      seen.add(key);
+      if (explorerApplied.get(key) === value) return true;
+      if (value === 0 && !explorerApplied.has(key)) return true; // never touched → leave alone
+      a.DwmSetWindowAttribute(hwnd, 38 /* DWMWA_SYSTEMBACKDROP_TYPE */, [value], 4);
+      if (value === 0) explorerApplied.delete(key); else explorerApplied.set(key, value);
+      return true;
+    }, 0);
+    for (const k of explorerApplied.keys()) if (!seen.has(k)) explorerApplied.delete(k);
+    return seen.size;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Give the taskbar back to Windows: Explorer re-applies its own look (incl.
  * transparency / accent colour) when the theme-changed notifications arrive.
  */
@@ -504,4 +536,4 @@ function handleToNumber(handle) {
   try { return hwndFromBuffer(handle); } catch { return 0; }
 }
 
-module.exports = { isLeftMouseDown, sendMediaKey, setTaskbarStyle, restoreTaskbar, getForegroundProcessName, getDesktopCursor, attachToDesktop, restack, getSystemWallpaperPath, getMonitorWallpapers, getCoveredMonitors, sendToBottom, getFullscreenState, refreshDesktop, handleToNumber, isAvailable: () => !!load() };
+module.exports = { setExplorerBackdrop, isLeftMouseDown, sendMediaKey, setTaskbarStyle, restoreTaskbar, getForegroundProcessName, getDesktopCursor, attachToDesktop, restack, getSystemWallpaperPath, getMonitorWallpapers, getCoveredMonitors, sendToBottom, getFullscreenState, refreshDesktop, handleToNumber, isAvailable: () => !!load() };
