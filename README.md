@@ -22,17 +22,18 @@ The app has two separate layers:
 - **GPU rendering**: the water map (drops, droplets, wipes, condensation) is drawn on the GPU with instanced sprites. Only the cheap drop physics runs on the CPU.
 - **Covered monitors**: drawing stops on monitors hidden behind maximized windows. The sound keeps playing.
 - **Mouse interaction**: moving the cursor over the desktop wipes the condensation and droplets, like a finger on a fogged window.
-- **Live weather**: rain intensity, thunder, wind and fog can follow the real weather in your city (Open-Meteo, no API key), updated every 15 minutes.
+- **Live weather**: the desktop follows the real weather in your city (Open-Meteo, no API key), updated every 10 minutes. Dry weather means a drying window; drizzle, rain and showers get their own intensity; snowfall switches to snow; storms bring thunder; fog brings condensation; strong wind is heard; below −2 °C frost forms.
 - **Automatic day/night**: the color grading follows the sun's elevation at your location.
 - **Soundscapes**: window, tin roof, leaves or car, plus optional wind.
 - **Preset gallery**: every preset shows a preview rendered over your own background. Presets can be exported and imported as `.json` files.
 - **Snow and frost**: snowflakes stick to the glass and melt, snow falls outside, and ice crystals grow from the window frame (wipe them with the mouse). Extra presets: *After the Storm*, *Snowy Window* and *Frosty Morning*. With live weather on, snow and frost follow the forecast.
 - **Depth parallax**: the background moves slightly with the cursor, as if you were looking through a real window.
 - **Rain screensaver**: starts after N idle minutes on every monitor, with an optional clock, and closes on any input. It never starts over games, videos or presentations.
-- **Sleep timer**: the rain sound fades out after 15, 30, 60 or 90 minutes (set it in *Atmosphere* or from the tray).
+- **Sleep timer**: after 15–120 minutes the rain sound fades out and then turns off, shuts the PC down or puts it to sleep. Windows warns a minute before shutting down, so it can still be cancelled. Set it in *Atmosphere* or from the tray.
+- **Thunder frequency**: from rare to very often.
 - **Schedule**: a different preset and image for each time of day, for example a foggy morning and a storm at night.
 - **Pause rules for apps**: the wallpaper pauses while a listed program (for example `photoshop.exe`) is in front.
-- **Languages**: English and Slovak (automatic from the system or chosen in *System*).
+- **Languages**: English, Slovak, Czech, German, French, Spanish, Italian and Hungarian. The app follows the system language automatically, or you can choose one in *System*.
 - **Global shortcuts**: Ctrl+Alt+R pauses or resumes the rain, Ctrl+Alt+W turns the wallpaper on or off, Ctrl+Alt+S opens the settings.
 - **Automatic updates** from GitHub Releases (installed version). **Live performance** stats (FPS, CPU, RAM, GPU) are shown in *System* and written to the log.
 

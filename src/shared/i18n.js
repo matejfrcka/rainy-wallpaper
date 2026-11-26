@@ -63,7 +63,7 @@
     'Follows the sun at your location (weather city, otherwise your time zone).': 'Riadi sa slnkom vo tvojej polohe (mesto z počasia, inak časové pásmo).',
     'Day / Night': 'Deň / Noc', 'Night ': 'Noc ', 'Day ': 'Deň ', 'Neutral ': 'Neutrálne ',
     'Sync rain with real weather': 'Dážď podľa skutočného počasia',
-    'Updates every 15 minutes. Manual changes are overwritten on the next update.': 'Aktualizuje sa každých 15 minút. Ručné zmeny sa pri ďalšej aktualizácii prepíšu.',
+    'Updates every 10 minutes: rain, snow, thunder, fog and wind follow the real weather. Manual changes are overwritten on the next update.': 'Aktualizuje sa každých 10 minút: dážď, sneh, hrom, hmla a vietor sa riadia skutočným počasím. Ručné zmeny sa pri ďalšej aktualizácii prepíšu.',
     'City, e.g. Bratislava': 'Mesto, napr. Bratislava', 'Set location': 'Nastaviť polohu',
     'Rain intensity and thunder follow the real weather at your location (Open-Meteo).': 'Intenzita dažďa a hrom sa riadia skutočným počasím vo tvojej polohe (Open-Meteo).',
     'Weather location set: ': 'Poloha pre počasie: ', 'updated': 'aktualizované',
@@ -117,21 +117,65 @@
     'How much snow sticks to the glass.': 'Koľko snehu sa nalepí na sklo.', 'Flake size': 'Veľkosť vločiek', 'Melting speed': 'Rýchlosť topenia',
     'How fast the snow on the glass melts away.': 'Ako rýchlo sa sneh na skle roztopí.', 'Falling snow outside': 'Padajúci sneh vonku',
     'Snowflakes falling behind the window. 0 = off.': 'Vločky padajúce za oknom. 0 = vypnuté.',
+    'Sound off': 'Vypnúť zvuk', 'Shut down PC': 'Vypnúť PC', 'Sleep PC': 'Uspať PC', 'When the time is up': 'Po uplynutí času', 'After': 'Po',
+    'PC shuts down in': 'PC sa vypne o', 'PC goes to sleep in': 'PC sa uspí o',
+    'The sound fades out, then the PC shuts down. Windows warns you a minute before so you can still cancel it.': 'Zvuk stíchne a potom sa PC vypne. Windows ťa minútu vopred upozorní, takže to ešte môžeš zrušiť.',
+    'The sound fades out, then the PC goes to sleep.': 'Zvuk stíchne a potom sa PC uspí.',
+    'Thunder frequency': 'Frekvencia hromov', 'Rarely': 'Zriedka', 'Sometimes': 'Občas', 'Often': 'Často', 'Very often': 'Veľmi často',
+    "Online": "Online",
+    "Search millions of free photos and videos and use them as the background.": "Vyhľadaj z miliónov bezplatných fotiek a videí a použi ich ako pozadie.",
+    "Load more": "Načítať ďalšie",
+    "Search, e.g. rainy city night": "Hľadať, napr. rainy city night",
+    "Photos": "Fotky",
+    "Videos": "Videá",
+    "Night city": "Mesto v noci",
+    "Forest": "Les",
+    "Mountains": "Hory",
+    "Cozy": "Útulné",
+    "Autumn": "Jeseň",
+    "Ocean": "More",
+    "Neon": "Neón",
+    "Open on Pixabay": "Otvoriť na Pixabay",
+    "Searching…": "Hľadám…",
+    "results": "výsledkov",
+    "Images and videos from Pixabay": "Obrázky a videá z Pixabay",
+    "Nothing found – try another word (English works best).": "Nič sa nenašlo – skús iné slovo (najlepšie po anglicky).",
+    "No Pixabay API key – enter your own key below.": "Chýba kľúč Pixabay API – zadaj vlastný kľúč nižšie.",
+    "Recently used": "Naposledy použité",
+    "Search": "Hľadať",
+    "Own API key (optional)": "Vlastný API kľúč (voliteľné)",
+    "Pixabay API key": "Pixabay API kľúč",
+    "Leave empty to use the built-in key": "Nechaj prázdne pre vstavaný kľúč",
+    "Get a free key at pixabay.com/api/docs after logging in.": "Bezplatný kľúč získaš po prihlásení na pixabay.com/api/docs.",
     'Open Settings': 'Otvoriť nastavenia', 'Change background…': 'Zmeniť pozadie…', 'Quit': 'Ukončiť',
   };
 
+  const CODES = ['sk', 'cs', 'de', 'es', 'it', 'hu', 'fr'];
   const LANGS = { sk: SK };
   let current = 'en';
 
-  /** 'auto' → language from the OS locale. */
-  function resolve(setting, locale) {
-    if (setting && setting !== 'auto') return LANGS[setting] ? setting : 'en';
-    const l = String(locale || '').toLowerCase();
-    return l.startsWith('sk') || l.startsWith('cs') ? 'sk' : 'en';
+  /** Other languages live in ./locales/<code>.js (loaded via require or <script>). */
+  function dict(lang) {
+    if (LANGS[lang]) return LANGS[lang];
+    let d = null;
+    if (typeof module === 'object' && module.exports) {
+      try { d = require('./locales/' + lang); } catch { d = null; }
+    } else if (typeof self !== 'undefined' && self.RainGlassLocales) {
+      d = self.RainGlassLocales[lang] || null;
+    }
+    if (d) LANGS[lang] = d;
+    return d;
   }
 
-  function setLanguage(lang) { current = LANGS[lang] ? lang : 'en'; }
-  function t(text) { const d = LANGS[current]; return (d && d[text]) || text; }
+  /** 'auto' → language from the OS locale. */
+  function resolve(setting, locale) {
+    if (setting && setting !== 'auto') return CODES.includes(setting) ? setting : 'en';
+    const l = String(locale || '').toLowerCase().slice(0, 2);
+    return CODES.includes(l) ? l : 'en';
+  }
+
+  function setLanguage(lang) { current = CODES.includes(lang) ? lang : 'en'; }
+  function t(text) { const d = current === 'en' ? null : dict(current); return (d && d[text]) || text; }
 
   return { t, setLanguage, resolve, get language() { return current; } };
 });

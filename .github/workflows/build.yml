@@ -25,6 +25,14 @@ jobs:
       - run: npm ci
       - run: npm test
 
+      # Built-in API keys for online backgrounds: repository secret PIXABAY_KEY
+      # (Settings → Secrets and variables → Actions). Never committed.
+      - name: Write API keys
+        shell: bash
+        env:
+          PIXABAY_KEY: ${{ secrets.PIXABAY_KEY }}
+        run: printf '{"pixabay":"%s"}\n' "$PIXABAY_KEY" > src/main/build-keys.json
+
       # Code signing (optional): add the repository secrets
       #   WIN_CSC_LINK          – base64 of the .pfx certificate (or an https URL)
       #   WIN_CSC_KEY_PASSWORD  – its password

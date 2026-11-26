@@ -17,6 +17,7 @@ const i18n = require('../shared/i18n');
 const updater = require('./updater');
 const { Screensaver } = require('./screensaver');
 const gallery = require('./gallery-manager');
+const online = require('./online');
 const t = (x) => i18n.t(x);
 const win32 = require('./win32');
 
@@ -119,34 +120,58 @@ function refreshImage(force = false) {
 }
 
 function fullStatus() {
-  return { ...status, paused: wallpapers.paused, displays: wallpapers.displays(), enabled: wallpapers.enabled, attach: wallpapers.attach, metrics, weather: weatherState, update: { ...updater.state }, sleep: sleep ? { endsAt: sleep.endsAt, minutes: sleep.minutes } : null };
+  return { ...status, paused: wallpapers.paused, displays: wallpapers.displays(), enabled: wallpapers.enabled, attach: wallpapers.attach, metrics, weather: weatherState, update: { ...updater.state }, sleep: sleep ? { endsAt: sleep.endsAt, minutes: sleep.minutes, action: sleep.action } : null };
 }
 
 /* ----------------------------------------------------------- sleep timer */
 
-let sleep = null; // { endsAt, timer }
+let sleep = null; // { endsAt, minutes, action, timers[] }
 
-function setSleepTimer(minutes) {
-  if (sleep) clearTimeout(sleep.timer);
+/** Run a Windows command (shutdown / sleep); no-op elsewhere. */
+function winCommand(file, args) {
+  if (process.platform !== 'win32') { log(`(skipped on ${process.platform}) ${file} ${args.join(' ')}`); return; }
+  require('child_process').execFile(file, args, { windowsHide: true }, (err) => { if (err) log(`${file} failed: ${err.message}`); });
+}
+
+/**
+ * Sleep timer. action: 'sound' – fade out and turn off the rain sound,
+ * 'shutdown' – shut the PC down (Windows shows its own 60 s warning),
+ * 'sleep' – put the PC to sleep. The sound always fades out first.
+ */
+function setSleepTimer(minutes, action = 'sound') {
+  const pendingShutdown = sleep && sleep.shutdownScheduled;
+  if (sleep) sleep.timers.forEach(clearTimeout);
+  if (pendingShutdown) winCommand('shutdown', ['/a']); // cancel a shutdown that is already counting down
   sleep = null;
   minutes = Number(minutes) || 0;
+  if (!['sound', 'shutdown', 'sleep'].includes(action)) action = 'sound';
   if (minutes > 0) {
-    const endsAt = Date.now() + minutes * 60 * 1000;
-    sleep = {
-      endsAt, minutes,
-      timer: setTimeout(() => {
-        log('sleep timer: sound off');
-        sleep = null;
-        applySettings({ soundEnabled: false });
-        wallpapers.broadcast('audio:sleep', null);
-        pushStatus();
-      }, minutes * 60 * 1000),
-    };
-    if (!store.get().soundEnabled) applySettings({ soundEnabled: true });
-    log(`sleep timer: ${minutes} min`);
+    const ms = minutes * 60 * 1000;
+    const endsAt = Date.now() + ms;
+    const st = sleep = { endsAt, minutes, action, timers: [], shutdownScheduled: false };
+    if (action === 'shutdown') {
+      // Hand over to Windows one minute early so the user gets the system warning and can still cancel.
+      st.timers.push(setTimeout(() => {
+        st.shutdownScheduled = true;
+        winCommand('shutdown', ['/s', '/t', '60', '/c', 'Rainy Glass: sleep timer – the PC will shut down in 1 minute.']);
+        log('sleep timer: shutdown scheduled');
+      }, Math.max(0, ms - 60000)));
+    }
+    st.timers.push(setTimeout(() => {
+      log(`sleep timer: ${action}`);
+      sleep = null;
+      applySettings({ soundEnabled: false });
+      wallpapers.broadcast('audio:sleep', null);
+      if (action === 'sleep') winCommand('rundll32.exe', ['powrprof.dll,SetSuspendState', '0,1,0']);
+      pushStatus();
+      updateTrayMenu();
+    }, ms));
+    if (!store.get().soundEnabled && action === 'sound') applySettings({ soundEnabled: true });
+    log(`sleep timer: ${minutes} min, action=${action}`);
   }
   wallpapers.broadcast('audio:sleep', sleep ? sleep.endsAt : null);
   pushStatus();
+  updateTrayMenu();
 }
 
 /* ------------------------------------------------------------- scheduler */
@@ -275,7 +300,7 @@ async function updateWeather() {
 
 function startWeather() {
   updateWeather();
-  setInterval(updateWeather, 15 * 60 * 1000);
+  setInterval(updateWeather, 10 * 60 * 1000);
 }
 
 function updateDayNight() {
@@ -440,9 +465,17 @@ function updateTrayMenu() {
     { label: wallpapers.paused ? t('Resume rain') : t('Pause rain'), click: () => setPaused(!wallpapers.paused) },
     { label: t('Change background…'), click: () => selectImage() },
     { label: t('Rain sound'), type: 'checkbox', checked: s.soundEnabled, click: (i) => applySettings({ soundEnabled: i.checked }) },
-    { label: t('Sleep timer'), submenu: [0, 15, 30, 60, 90].map((m) => ({
-      label: m ? `${m} min` : t('Off'), type: 'radio', checked: m ? !!sleep && sleep.minutes === m : !sleep, click: () => { setSleepTimer(m); updateTrayMenu(); },
-    })) },
+    { label: t('Sleep timer'), submenu: [
+      ...[0, 15, 30, 60, 90].map((m) => ({
+        label: m ? `${t('Sound off')} · ${m} min` : t('Off'), type: 'radio',
+        checked: m ? !!sleep && sleep.action === 'sound' && sleep.minutes === m : !sleep, click: () => setSleepTimer(m, 'sound'),
+      })),
+      { type: 'separator' },
+      ...[30, 60, 90, 120].map((m) => ({
+        label: `${t('Shut down PC')} · ${m} min`, type: 'radio',
+        checked: !!sleep && sleep.action === 'shutdown' && sleep.minutes === m, click: () => setSleepTimer(m, 'shutdown'),
+      })),
+    ] },
     { type: 'separator' },
     { label: t('Start with Windows'), type: 'checkbox', checked: s.startWithWindows, click: (i) => applySettings({ startWithWindows: i.checked }) },
     updater.state.status === 'ready'
@@ -546,7 +579,7 @@ function registerIpc() {
     const img = currentImage;
     const file = imagePathFor(displayId);
     if (!file) return null;
-    const meta = { name: img.name, path: file, source: img.source, key: img.key, gallery: img.gallery || null };
+    const meta = { name: img.name, path: file, source: img.source, key: img.key, gallery: img.gallery || null, credit: online.creditFor(file) };
     if (images.isVideo(file)) {
       // Videos are streamed through rainmedia:// instead of copied over IPC.
       return { ...meta, kind: 'video', mime: images.mimeOf(file), url: `rainmedia://media/${displayId || 'primary'}?k=${encodeURIComponent(img.key)}` };
@@ -614,11 +647,22 @@ function registerIpc() {
   });
 
   ipcMain.handle('sleep:get', () => (sleep ? sleep.endsAt : null));
-  ipcMain.handle('sleep:set', (_e, minutes) => setSleepTimer(minutes));
+  ipcMain.handle('sleep:set', (_e, minutes, action) => setSleepTimer(minutes, action));
   ipcMain.on('screensaver:exit', () => screensaver.stop());
   ipcMain.handle('screensaver:test', () => { if (settingsWin) settingsWin.minimize(); setTimeout(() => screensaver.show(), 400); });
   ipcMain.handle('schedule:pick-image', async () => {
     try { return await images.pickImage(settingsWin); } catch (e) { dialog.showErrorBox('Unable to use this image', e.message); return null; }
+  });
+
+  ipcMain.handle('online:status', () => ({ hasKey: !!online.apiKey(store.get()) }));
+  ipcMain.handle('online:search', (_e, q) => online.search(store.get(), q || {}));
+  ipcMain.handle('online:history', () => online.history());
+  ipcMain.handle('online:use', async (_e, item) => {
+    const file = await online.download(item, (p) => sendToSettings('online:progress', { id: item.id, progress: p }));
+    return applySettings({ backgroundPath: file });
+  });
+  ipcMain.handle('online:open', (_e, url) => {
+    if (/^https:\/\/pixabay\.com\//.test(String(url))) shell.openExternal(url);
   });
 
   ipcMain.handle('gallery:list', () => gallery.list());
