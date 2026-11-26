@@ -27,6 +27,7 @@ function load() {
     const GUID = koffi.struct('GUID', { d1: 'uint32', d2: 'uint16', d3: 'uint16', d4: koffi.array('uint8', 8) });
 
     const RECT = koffi.struct('RECT', { left: 'int32', top: 'int32', right: 'int32', bottom: 'int32' });
+    const POINT = koffi.struct('POINT', { x: 'int32', y: 'int32' });
     const MONITORINFO = koffi.struct('MONITORINFO', { cbSize: 'uint32', rcMonitor: RECT, rcWork: RECT, dwFlags: 'uint32' });
     const EnumWindowsProc = koffi.proto('bool __stdcall EnumWindowsProc(intptr_t hwnd, intptr_t lParam)');
 
@@ -51,6 +52,8 @@ function load() {
       MonitorFromWindow: user32.func('intptr_t __stdcall MonitorFromWindow(intptr_t hwnd, uint32 flags)'),
       GetMonitorInfoW: user32.func('bool __stdcall GetMonitorInfoW(intptr_t monitor, _Inout_ MONITORINFO *info)'),
       SystemParametersInfoW: user32.func('bool __stdcall SystemParametersInfoW(uint32 action, uint32 param, _Inout_ uint16_t *pv, uint32 winIni)'),
+      GetCursorPos: user32.func('bool __stdcall GetCursorPos(_Out_ POINT *pt)'),
+      WindowFromPoint: user32.func('intptr_t __stdcall WindowFromPoint(POINT pt)'),
       IsIconic: user32.func('bool __stdcall IsIconic(intptr_t hwnd)'),
       IsZoomed: user32.func('bool __stdcall IsZoomed(intptr_t hwnd)'),
       GetWindowTextLengthW: user32.func('int __stdcall GetWindowTextLengthW(intptr_t hwnd)'),
@@ -274,6 +277,27 @@ function getCoveredMonitors(ownHandles = new Set()) {
   return [...covered.values()];
 }
 
+/**
+ * Cursor position (physical px) when it is over the desktop (icons layer or
+ * our wallpaper), otherwise null.
+ */
+function getDesktopCursor(ownHandles = new Set()) {
+  const a = load();
+  if (!a) return null;
+  try {
+    const pt = {};
+    if (!a.GetCursorPos(pt)) return null;
+    const hwnd = a.WindowFromPoint(pt);
+    if (!hwnd) return null;
+    const root = a.GetAncestor(hwnd, 2 /* GA_ROOT */) || hwnd;
+    if (ownHandles.has(Number(hwnd)) || ownHandles.has(Number(root))) return pt;
+    const cls = className(a, root);
+    return cls === 'Progman' || cls === 'WorkerW' ? pt : null;
+  } catch {
+    return null;
+  }
+}
+
 /* ---------------- per-monitor wallpapers (IDesktopWallpaper COM) ---------------- */
 
 const guid = (d1, d2, d3, d4) => ({ d1, d2, d3, d4 });
@@ -360,4 +384,4 @@ function handleToNumber(handle) {
   try { return hwndFromBuffer(handle); } catch { return 0; }
 }
 
-module.exports = { attachToDesktop, restack, getSystemWallpaperPath, getMonitorWallpapers, getCoveredMonitors, sendToBottom, getFullscreenState, refreshDesktop, handleToNumber, isAvailable: () => !!load() };
+module.exports = { getDesktopCursor, attachToDesktop, restack, getSystemWallpaperPath, getMonitorWallpapers, getCoveredMonitors, sendToBottom, getFullscreenState, refreshDesktop, handleToNumber, isAvailable: () => !!load() };

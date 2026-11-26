@@ -6,12 +6,17 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell, screen, protocol } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, shell, screen, protocol, globalShortcut } = require('electron');
 const { SettingsStore } = require('./settings-store');
 const { WallpaperManager } = require('./wallpaper-manager');
 const { SystemMonitor } = require('./system-monitor');
 const images = require('./image-manager');
 const { buildWallpaperEngineProject } = require('./we-export');
+const weather = require('./weather');
+const i18n = require('../shared/i18n');
+const updater = require('./updater');
+const t = (x) => i18n.t(x);
+const win32 = require('./win32');
 
 const PRELOAD = path.join(__dirname, '..', 'preload', 'preload.js');
 const ASSETS = path.join(__dirname, '..', '..', 'assets');
@@ -103,7 +108,89 @@ function refreshImage(force = false) {
 }
 
 function fullStatus() {
-  return { ...status, paused: wallpapers.paused, displays: wallpapers.displays(), enabled: wallpapers.enabled, attach: wallpapers.attach, metrics };
+  return { ...status, paused: wallpapers.paused, displays: wallpapers.displays(), enabled: wallpapers.enabled, attach: wallpapers.attach, metrics, weather: weatherState, update: { ...updater.state } };
+}
+
+/* --------------------------------------------------------------- hotkeys */
+
+function registerHotkeys() {
+  globalShortcut.unregisterAll();
+  if (!store.get().hotkeysEnabled) return;
+  const keys = {
+    'CommandOrControl+Alt+R': () => setPaused(!wallpapers.paused),
+    'CommandOrControl+Alt+W': () => applySettings({ wallpaperEnabled: !store.get().wallpaperEnabled }),
+    'CommandOrControl+Alt+S': () => showSettings(),
+  };
+  for (const [accel, fn] of Object.entries(keys)) {
+    try {
+      if (!globalShortcut.register(accel, fn)) log(`hotkey ${accel} is used by another app`);
+    } catch (e) { log(`hotkey ${accel}: ${e.message}`); }
+  }
+}
+
+/* --------------------------------------------------- desktop interaction */
+
+/** Forward the cursor to the wallpaper under it (30 Hz, only over the desktop). */
+function startPointer() {
+  let last = '';
+  setInterval(() => {
+    const s = store.get();
+    if (!s.mouseInteraction || !wallpapers.enabled || status.suspended || !wallpapers.windows.size) return;
+    let phys;
+    if (process.platform === 'win32') phys = win32.getDesktopCursor(wallpapers.ownHandles());
+    else phys = screen.getCursorScreenPoint();
+    if (!phys) return;
+    const key = phys.x + ',' + phys.y;
+    if (key === last) return;
+    last = key;
+    for (const d of screen.getAllDisplays()) {
+      const r = wallpapers.physicalRect(d);
+      if (phys.x < r.x || phys.y < r.y || phys.x >= r.x + r.width || phys.y >= r.y + r.height) continue;
+      const win = wallpapers.windows.get(d.id);
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('wallpaper:pointer', (phys.x - r.x) * (d.bounds.width / r.width), (phys.y - r.y) * (d.bounds.height / r.height));
+      }
+      break;
+    }
+  }, 33);
+}
+
+/* ----------------------------------------------------- weather & daylight */
+
+let weatherState = null;
+
+async function updateWeather() {
+  const s = store.get();
+  if (!s.weatherSync || !s.weatherCity) return;
+  try {
+    const w = await weather.current(s.weatherLat, s.weatherLon);
+    weatherState = { ...w, city: s.weatherCity };
+    const patch = weather.toSettings(w);
+    log(`weather: ${w.text} ${w.temp}°C ${w.precip}mm → rain ${patch.rainIntensity}%`);
+    applySettings(patch);
+  } catch (e) {
+    weatherState = { error: e.message, city: s.weatherCity, time: Date.now() };
+    log('weather error: ' + e.message);
+  }
+  pushStatus();
+}
+
+function startWeather() {
+  updateWeather();
+  setInterval(updateWeather, 15 * 60 * 1000);
+}
+
+function updateDayNight() {
+  const s = store.get();
+  if (!s.autoDayNight) return;
+  const loc = s.weatherCity ? { lat: s.weatherLat, lon: s.weatherLon } : weather.guessLocation();
+  const value = weather.dayNightFor(weather.sunElevation(new Date(), loc.lat, loc.lon));
+  if (Math.abs(value - s.dayNight) >= 1) applySettings({ dayNight: value });
+}
+
+function startDayNight() {
+  updateDayNight();
+  setInterval(updateDayNight, 60 * 1000);
 }
 
 /* ------------------------------------------------------------ performance */
@@ -134,6 +221,7 @@ function startMetrics() {
 
 function init() {
   store = new SettingsStore(app.getPath('userData'));
+  i18n.setLanguage(i18n.resolve(store.get().language, app.getLocale()));
   logFile = path.join(app.getPath('userData'), 'rainy-glass.log');
   try { fs.writeFileSync(logFile, ''); } catch { /* ignore */ }
   log(`start v${app.getVersion()} ${process.platform} ${os.release()} electron ${process.versions.electron}`);
@@ -151,6 +239,11 @@ function init() {
     onCovered: (rects) => { wallpapers.setCovered(rects); pushStatus(); },
   });
   startMetrics();
+  registerHotkeys();
+  updater.init({ log, getSettings: () => store.get(), onState: () => { pushStatus(); updateTrayMenu(); } });
+  startPointer();
+  startWeather();
+  startDayNight();
 
   // A missing image (moved / deleted) falls back to the neutral background.
   const s = store.get();
@@ -239,16 +332,19 @@ function updateTrayMenu() {
   if (!tray) return;
   const s = store.get();
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Open Settings', click: showSettings },
+    { label: t('Open Settings'), click: showSettings },
     { type: 'separator' },
-    { label: 'Live wallpaper', type: 'checkbox', checked: s.wallpaperEnabled, click: (i) => applySettings({ wallpaperEnabled: i.checked }) },
-    { label: wallpapers.paused ? 'Resume rain' : 'Pause rain', click: () => setPaused(!wallpapers.paused) },
-    { label: 'Change background…', click: () => selectImage() },
-    { label: 'Rain sound', type: 'checkbox', checked: s.soundEnabled, click: (i) => applySettings({ soundEnabled: i.checked }) },
+    { label: t('Live wallpaper'), type: 'checkbox', checked: s.wallpaperEnabled, click: (i) => applySettings({ wallpaperEnabled: i.checked }) },
+    { label: wallpapers.paused ? t('Resume rain') : t('Pause rain'), click: () => setPaused(!wallpapers.paused) },
+    { label: t('Change background…'), click: () => selectImage() },
+    { label: t('Rain sound'), type: 'checkbox', checked: s.soundEnabled, click: (i) => applySettings({ soundEnabled: i.checked }) },
     { type: 'separator' },
-    { label: 'Start with Windows', type: 'checkbox', checked: s.startWithWindows, click: (i) => applySettings({ startWithWindows: i.checked }) },
+    { label: t('Start with Windows'), type: 'checkbox', checked: s.startWithWindows, click: (i) => applySettings({ startWithWindows: i.checked }) },
+    updater.state.status === 'ready'
+      ? { label: `${t('Restart to update')} (${updater.state.version})`, click: () => updater.quitAndInstall() }
+      : { label: t('Check for updates'), click: () => updater.check(true) },
     { type: 'separator' },
-    { label: 'Quit', click: () => app.quit() },
+    { label: t('Quit'), click: () => app.quit() },
   ]));
 }
 
@@ -280,6 +376,14 @@ function applySettings(partial, origin) {
     setTimeout(pushStatus, 300);
   }
   if (changed.some((k) => k === 'pauseOnFullscreen' || k === 'pauseOnBattery')) monitor.evaluate();
+  if (changed.includes('weatherSync') && settings.weatherSync) updateWeather();
+  if (changed.includes('language')) {
+    i18n.setLanguage(i18n.resolve(settings.language, app.getLocale()));
+    updateTrayMenu();
+    if (settingsWin && !settingsWin.isDestroyed()) setTimeout(() => settingsWin.reload(), 150);
+  }
+  if (changed.includes('hotkeysEnabled')) registerHotkeys();
+  if (changed.includes('autoDayNight') && settings.autoDayNight) updateDayNight();
   if (changed.some((k) => ['soundEnabled', 'wallpaperEnabled', 'startWithWindows'].includes(k))) updateTrayMenu();
   return settings;
 }
@@ -309,6 +413,7 @@ function registerIpc() {
     presets: store.presets(),
     status: fullStatus(),
     version: app.getVersion(),
+    lang: i18n.language,
     platform: process.platform,
     formats: images.EXTENSIONS,
   }));
@@ -365,6 +470,38 @@ function registerIpc() {
     pushStatus();
   });
 
+  ipcMain.handle('weather:search', async (_e, city) => {
+    const loc = await weather.geocode(String(city || '').slice(0, 80));
+    applySettings({ weatherCity: loc.name, weatherLat: loc.lat, weatherLon: loc.lon, weatherSync: true });
+    await updateWeather();
+    return withImage(store.get());
+  });
+
+  ipcMain.handle('update:check', () => updater.check(true));
+  ipcMain.handle('update:install', () => updater.quitAndInstall());
+
+  ipcMain.handle('preset:export', async (_e, name) => {
+    const p = store.presets().find((x) => x.name === name);
+    if (!p) throw new Error('Preset not found');
+    const res = await dialog.showSaveDialog(settingsWin, { title: 'Export preset', defaultPath: `${p.name}.rainyglass.json`, filters: [{ name: 'Rainy Glass preset', extensions: ['json'] }] });
+    if (res.canceled || !res.filePath) return null;
+    fs.writeFileSync(res.filePath, JSON.stringify({ format: 'rainy-glass-preset', version: 1, name: p.name, values: p.values }, null, 2));
+    return res.filePath;
+  });
+  ipcMain.handle('preset:import', async () => {
+    const res = await dialog.showOpenDialog(settingsWin, { title: 'Import preset', properties: ['openFile', 'multiSelections'], filters: [{ name: 'Rainy Glass preset', extensions: ['json'] }] });
+    if (res.canceled) return null;
+    let presets = store.presets();
+    for (const file of res.filePaths) {
+      const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (!data || data.format !== 'rainy-glass-preset' || typeof data.values !== 'object') throw new Error(path.basename(file) + ' is not a Rainy Glass preset');
+      let name = String(data.name || path.basename(file, '.json')).slice(0, 40);
+      if (presets.some((x) => x.builtin && x.name.toLowerCase() === name.toLowerCase())) name += ' (imported)';
+      presets = store.savePreset(name, data.values, true);
+    }
+    return presets;
+  });
+
   ipcMain.handle('log:open', () => shell.showItemInFolder(logFile));
 
   ipcMain.handle('export:we', async () => {
@@ -387,6 +524,8 @@ function registerIpc() {
 app.on('window-all-closed', () => {
   // Keep running in the tray (wallpaper windows don't count as user windows).
 });
+
+app.on('will-quit', () => globalShortcut.unregisterAll());
 
 app.on('before-quit', () => {
   if (monitor) monitor.stop();

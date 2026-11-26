@@ -28,6 +28,10 @@ contextBridge.exposeInMainWorld('rainApi', {
   savePreset: (name) => ipcRenderer.invoke('preset:save', name),
   deletePreset: (name) => ipcRenderer.invoke('preset:delete', name),
   applyPreset: (name) => ipcRenderer.invoke('preset:apply', name),
+  exportPreset: (name) => ipcRenderer.invoke('preset:export', name),
+  importPresets: () => ipcRenderer.invoke('preset:import'),
+  checkUpdates: () => ipcRenderer.invoke('update:check'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
 
   // Playback
   setPaused: (p) => ipcRenderer.invoke('rain:pause', p),
@@ -42,6 +46,8 @@ contextBridge.exposeInMainWorld('rainApi', {
 
   // Misc
   openLog: () => ipcRenderer.invoke('log:open'),
+  searchWeather: (city) => ipcRenderer.invoke('weather:search', city),
+  onPointer: on('wallpaper:pointer'),
   exportWallpaperEngine: () => ipcRenderer.invoke('export:we'),
   reportFps: (fps) => ipcRenderer.send('wallpaper:fps', fps),
   reportError: (msg) => ipcRenderer.send('wallpaper:error', String(msg)),

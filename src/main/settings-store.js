@@ -48,7 +48,7 @@ class SettingsStore {
 
   reset() {
     // Keep the chosen image and system options; reset the look.
-    const keep = ['backgroundPath', 'useSystemWallpaper', 'startWithWindows', 'wallpaperEnabled', 'pauseOnFullscreen', 'pauseOnBattery', 'pauseWhenCovered'];
+    const keep = ['backgroundPath', 'useSystemWallpaper', 'startWithWindows', 'wallpaperEnabled', 'pauseOnFullscreen', 'pauseOnBattery', 'pauseWhenCovered', 'mouseInteraction', 'weatherSync', 'weatherCity', 'weatherLat', 'weatherLon', 'autoDayNight', 'hotkeysEnabled', 'autoUpdate', 'language'];
     const next = { ...DEFAULT_SETTINGS };
     for (const k of keep) next[k] = this.settings[k];
     return this.update(next);
@@ -72,11 +72,11 @@ class SettingsStore {
     return [...BUILTIN_PRESETS, ...this.userPresets.map((p) => ({ ...p, builtin: false }))];
   }
 
-  savePreset(name, values) {
+  savePreset(name, values, valuesOnly = false) {
     name = String(name || '').trim().slice(0, 48);
     if (!name) throw new Error('Preset name is required');
     if (BUILTIN_PRESETS.some((p) => p.name.toLowerCase() === name.toLowerCase())) throw new Error('A built-in preset already uses this name');
-    const src = sanitize({ ...this.settings, ...(values || {}) });
+    const src = sanitize({ ...(valuesOnly ? DEFAULT_SETTINGS : this.settings), ...(values || {}) });
     const picked = {};
     for (const k of PRESET_KEYS) picked[k] = src[k];
     const idx = this.userPresets.findIndex((p) => p.name.toLowerCase() === name.toLowerCase());

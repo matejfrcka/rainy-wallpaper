@@ -3,6 +3,12 @@
   'use strict';
   const api = window.rainApi;
   const { DEFAULT_SETTINGS } = window.RainGlassDefaults;
+  const state = await api.getState();
+  const { t } = window.RainGlassI18n;
+  window.RainGlassI18n.setLanguage(state.lang);
+  document.documentElement.lang = state.lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t(el.textContent.trim());
+  for (const el of document.querySelectorAll('[title]')) el.title = t(el.title);
   const $ = (sel, el = document) => el.querySelector(sel);
   const h = (tag, attrs = {}, ...children) => {
     const el = document.createElement(tag);
@@ -41,95 +47,109 @@
 
   const SECTIONS = [
     {
-      id: 'background', title: 'Background', lead: 'Choose any image from your computer. The rain layer never modifies it.',
+      id: 'background', title: t('Background'), lead: t('Choose any image from your computer. The rain layer never modifies it.'),
       custom: 'image',
       groups: [
-        { title: 'Source', items: [
-          toggle('useSystemWallpaper', 'Use Windows wallpaper automatically', { hint: 'When no custom image is selected, the rain is applied over your current Windows desktop wallpaper.' }),
+        { title: t('Source'), items: [
+          toggle('useSystemWallpaper', t('Use Windows wallpaper automatically'), { hint: t('When no custom image is selected, the rain is applied over your current Windows desktop wallpaper.') }),
         ] },
-        { title: 'Layout', items: [
-          seg('fitMode', 'Scaling', [['fill', 'Fill'], ['fit', 'Fit'], ['stretch', 'Stretch']], { hint: 'Fill crops to cover the monitor, Fit shows the whole image.' }),
-          slider('bgZoom', 'Zoom', { min: 100, max: 200 }),
-          slider('bgPosX', 'Horizontal position', { unit: '', format: (v) => (v < 45 ? 'Left ' : v > 55 ? 'Right ' : 'Center ') + Math.round(v) }),
-          slider('bgPosY', 'Vertical position', { unit: '', format: (v) => (v < 45 ? 'Top ' : v > 55 ? 'Bottom ' : 'Center ') + Math.round(v) }),
+        { title: t('Layout'), items: [
+          seg('fitMode', t('Scaling'), [['fill', t('Fill')], ['fit', t('Fit')], ['stretch', t('Stretch')]], { hint: t('Fill crops to cover the monitor, Fit shows the whole image.') }),
+          slider('bgZoom', t('Zoom'), { min: 100, max: 200 }),
+          slider('bgPosX', t('Horizontal position'), { unit: '', format: (v) => (v < 45 ? t('Left ') : v > 55 ? t('Right ') : t('Center ')) + Math.round(v) }),
+          slider('bgPosY', t('Vertical position'), { unit: '', format: (v) => (v < 45 ? t('Top ') : v > 55 ? t('Bottom ') : t('Center ')) + Math.round(v) }),
         ] },
-        { title: 'Adjustments', items: [
-          slider('bgBrightness', 'Brightness', { max: 200 }),
-          slider('bgBlur', 'Blur'),
+        { title: t('Adjustments'), items: [
+          slider('bgBrightness', t('Brightness'), { max: 200 }),
+          slider('bgBlur', t('Blur')),
         ] },
       ],
     },
     {
-      id: 'rain', title: 'Rain', lead: 'Physics of the water on the glass.',
+      id: 'rain', title: t('Rain'), lead: t('Physics of the water on the glass.'),
       groups: [
-        { title: 'Amount', items: [
-          slider('rainIntensity', 'Rain intensity', { hint: 'How often new drops hit the window.' }),
-          slider('dropletDensity', 'Droplet density', { hint: 'Tiny static droplets covering the glass.' }),
-          slider('dropletSize', 'Droplet size'),
+        { title: t('Amount'), items: [
+          slider('rainIntensity', t('Rain intensity'), { hint: t('How often new drops hit the window.') }),
+          slider('dropletDensity', t('Droplet density'), { hint: t('Tiny static droplets covering the glass.') }),
+          slider('dropletSize', t('Droplet size')),
         ] },
-        { title: 'Motion', items: [
-          slider('dropletSpeed', 'Droplet speed'),
-          slider('trailLength', 'Water trail length'),
-          toggle('merging', 'Droplet merging', { hint: 'Drops that touch combine into larger, faster drops.' }),
-          toggle('randomGeneration', 'Random droplet generation', { hint: 'New drops keep forming. Off = the glass slowly dries.' }),
+        { title: t('Motion'), items: [
+          slider('dropletSpeed', t('Droplet speed')),
+          slider('trailLength', t('Water trail length')),
+          toggle('merging', t('Droplet merging'), { hint: t('Drops that touch combine into larger, faster drops.') }),
+          toggle('randomGeneration', t('Random droplet generation'), { hint: t('New drops keep forming. Off = the glass slowly dries.') }),
+        ] },
+        { title: t('Interaction'), items: [
+          toggle('mouseInteraction', t('Wipe the glass with the mouse'), { hint: t('Moving the cursor over the desktop wipes condensation and droplets, like a finger.') }),
         ] },
       ],
     },
     {
-      id: 'glass', title: 'Glass', lead: 'Optical properties of the window and the water lenses.',
+      id: 'glass', title: t('Glass'), lead: t('Optical properties of the window and the water lenses.'),
       groups: [
-        { title: 'Optics', items: [
-          slider('refraction', 'Refraction intensity'),
-          slider('distortion', 'Distortion intensity'),
-          slider('chromatic', 'Chromatic refraction'),
-          slider('blur', 'Blur intensity', { hint: 'Defocus inside large drops.' }),
+        { title: t('Optics'), items: [
+          slider('refraction', t('Refraction intensity')),
+          slider('distortion', t('Distortion intensity')),
+          slider('chromatic', t('Chromatic refraction')),
+          slider('blur', t('Blur intensity'), { hint: t('Defocus inside large drops.') }),
         ] },
-        { title: 'Surface', items: [
-          slider('glassTransparency', 'Glass transparency'),
-          slider('reflection', 'Reflection intensity'),
-          toggle('condensationEnabled', 'Condensation / fog'),
-          slider('condensation', 'Condensation intensity', { dependsOn: 'condensationEnabled' }),
-          toggle('streaksEnabled', 'Rain streaks', { hint: 'Out-of-focus rain falling outside.' }),
-          slider('streaks', 'Streak intensity', { dependsOn: 'streaksEnabled' }),
+        { title: t('Surface'), items: [
+          slider('glassTransparency', t('Glass transparency')),
+          slider('reflection', t('Reflection intensity')),
+          toggle('condensationEnabled', t('Condensation / fog')),
+          slider('condensation', t('Condensation intensity'), { dependsOn: 'condensationEnabled' }),
+          toggle('streaksEnabled', t('Rain streaks'), { hint: t('Out-of-focus rain falling outside.') }),
+          slider('streaks', t('Streak intensity'), { dependsOn: 'streaksEnabled' }),
         ] },
       ],
     },
     {
-      id: 'atmosphere', title: 'Atmosphere', lead: 'Sound and light. Audio plays from the desktop wallpaper.',
+      id: 'atmosphere', title: t('Atmosphere'), lead: t('Sound and light. Audio plays from the desktop wallpaper.'),
+      custom: 'weather',
       groups: [
-        { title: 'Sound', items: [
-          toggle('soundEnabled', 'Rain sound'),
-          slider('volume', 'Rain ambience volume', { dependsOn: 'soundEnabled' }),
-          toggle('thunderEnabled', 'Thunder', { hint: 'Occasional distant or close thunder.' }),
-          toggle('lightning', 'Lightning flashes', { dependsOn: 'thunderEnabled' }),
+        { title: t('Sound'), items: [
+          toggle('soundEnabled', t('Rain sound')),
+          slider('volume', t('Rain ambience volume'), { dependsOn: 'soundEnabled' }),
+          seg('soundscape', t('Soundscape'), [['window', t('Window')], ['roof', t('Tin roof')], ['leaves', t('Leaves')], ['car', t('Car')]], { dependsOn: 'soundEnabled' }),
+          toggle('windEnabled', t('Wind'), { dependsOn: 'soundEnabled' }),
+          slider('windVolume', t('Wind volume'), { dependsOn: 'windEnabled' }),
+          toggle('thunderEnabled', t('Thunder'), { hint: t('Occasional distant or close thunder.') }),
+          toggle('lightning', t('Lightning flashes'), { dependsOn: 'thunderEnabled' }),
         ] },
-        { title: 'Color', items: [
-          slider('dayNight', 'Day / Night', { unit: '', format: (v) => (v < 40 ? 'Night ' : v > 60 ? 'Day ' : 'Neutral ') + Math.round(v) }),
+        { title: t('Color'), items: [
+          toggle('autoDayNight', t('Automatic day / night'), { hint: t('Follows the sun at your location (weather city, otherwise your time zone).') }),
+          slider('dayNight', t('Day / Night'), { disabledBy: 'autoDayNight', unit: '', format: (v) => (v < 40 ? t('Night ') : v > 60 ? t('Day ') : t('Neutral ')) + Math.round(v) }),
         ] },
       ],
     },
-    { id: 'presets', title: 'Presets', lead: 'Save and load your favourite looks. Presets never change your image.', custom: 'presets', groups: [] },
+    { id: 'presets', title: t('Presets'), lead: t('Save and load your favourite looks. Presets never change your image.'), custom: 'presets', groups: [] },
     {
-      id: 'system', title: 'System', lead: 'Desktop integration and performance.',
+      id: 'system', title: t('System'), lead: t('Desktop integration and performance.'),
       custom: 'system',
       groups: [
-        { title: 'Desktop', items: [
-          toggle('wallpaperEnabled', 'Live wallpaper', { hint: 'Show the rain on your desktop (all monitors).' }),
-          toggle('startWithWindows', 'Start with Windows'),
-          toggle('pauseOnFullscreen', 'Pause when a fullscreen app or game runs'),
-          toggle('pauseWhenCovered', 'Pause on monitors covered by maximized windows', { hint: 'Saves GPU while you work; sound keeps playing.' }),
-          toggle('pauseOnBattery', 'Pause on battery power'),
+        { title: t('Desktop'), items: [
+          toggle('wallpaperEnabled', t('Live wallpaper'), { hint: t('Show the rain on your desktop (all monitors).') }),
+          toggle('startWithWindows', t('Start with Windows')),
+          toggle('pauseOnFullscreen', t('Pause when a fullscreen app or game runs')),
+          toggle('pauseWhenCovered', t('Pause on monitors covered by maximized windows'), { hint: t('Saves GPU while you work; sound keeps playing.') }),
+          toggle('pauseOnBattery', t('Pause on battery power')),
+          toggle('hotkeysEnabled', t('Global shortcuts'), { hint: t('Ctrl+Alt+R pause / resume rain · Ctrl+Alt+W wallpaper on / off · Ctrl+Alt+S open settings') }),
         ] },
-        { title: 'Performance', items: [
-          seg('fpsLimit', 'Frame rate', [[30, '30'], [60, '60'], [0, 'Max']]),
-          slider('renderScale', 'Render resolution', { min: 50, max: 100, hint: 'Lower values save GPU on 4K displays.' }),
+        { title: t('Language'), items: [
+          seg('language', t('Language'), [['auto', t('Automatic')], ['en', 'English'], ['sk', 'Slovenčina']]),
+        ] },
+        { title: t('Updates'), items: [
+          toggle('autoUpdate', t('Install updates automatically')),
+        ] },
+        { title: t('Performance'), items: [
+          seg('fpsLimit', t('Frame rate'), [[30, '30'], [60, '60'], [0, t('Max')]]),
+          slider('renderScale', t('Render resolution'), { min: 50, max: 100, hint: t('Lower values save GPU on 4K displays.') }),
         ] },
       ],
     },
   ];
 
   /* -------------------------------------------------------------- state */
-  const state = await api.getState();
   let settings = { ...DEFAULT_SETTINGS, ...state.settings };
   let presets = state.presets;
   let status = state.status;
@@ -145,7 +165,7 @@
     engine.setPaused(paused);
     engine.start();
   } catch (e) {
-    $('#previewBadge').textContent = 'Preview unavailable: ' + e.message;
+    $('#previewBadge').textContent = t('Preview unavailable: ') + e.message;
   }
 
   let previewKey;
@@ -195,13 +215,15 @@
     for (const [key, c] of controls) c.update(settings[key]);
     refreshDependencies();
     loadPreviewImage();
+    if (document.querySelector('.section.active[data-id="presets"]')) renderPresets();
   }
 
   function refreshDependencies() {
     for (const sec of SECTIONS) for (const g of sec.groups) for (const it of g.items) {
-      if (!it.dependsOn) continue;
+      if (!it.dependsOn && !it.disabledBy) continue;
       const c = controls.get(it.key);
-      if (c) c.row.classList.toggle('disabled', !settings[it.dependsOn]);
+      const off = (it.dependsOn && !settings[it.dependsOn]) || (it.disabledBy && settings[it.disabledBy]);
+      if (c) c.row.classList.toggle('disabled', !!off);
     }
   }
 
@@ -257,22 +279,22 @@
   const imageCard = h('div', { class: 'image-card glass' });
   function renderImageCard(img) {
     imageCard.innerHTML = '';
-    const thumb = h('div', { class: 'image-thumb', title: 'Click to choose an image', onclick: selectImage });
+    const thumb = h('div', { class: 'image-thumb', title: t('Click to choose an image'), onclick: selectImage });
     if (img && img.video) {
       const v = h('video', { src: img.url, muted: '', autoplay: '', loop: '', playsinline: '', crossorigin: 'anonymous' });
       v.muted = true;
       thumb.append(v);
     } else if (img) thumb.append(h('img', { src: img.url, alt: '' }));
-    else thumb.append(h('div', { class: 'empty' }, icon('upload'), 'Select or drop an image', h('span', { style: 'font-size:11px' }, state.formats.map((f) => f.toUpperCase()).join(' · '))));
+    else thumb.append(h('div', { class: 'empty' }, icon('upload'), t('Select or drop an image'), h('span', { style: 'font-size:11px' }, state.formats.map((f) => f.toUpperCase()).join(' · '))));
     const custom = img && img.source === 'custom';
     const label = custom ? img.name
-      : img ? 'Windows wallpaper (automatic)'
-      : settings.useSystemWallpaper ? 'Windows wallpaper not found – neutral gradient in use' : 'No image selected – neutral gradient in use';
+      : img ? t('Windows wallpaper (automatic)')
+      : settings.useSystemWallpaper ? t('Windows wallpaper not found – neutral gradient in use') : t('No image selected – neutral gradient in use');
     const meta = h('div', { class: 'image-meta' }, icon('image'), h('div', { class: 'image-name', title: img ? img.path : '' }, label),
-      img ? h('span', { class: 'preset-tag' }, custom ? 'Custom' : 'Windows') : null);
+      img ? h('span', { class: 'preset-tag' }, custom ? t('Custom') : t('Windows')) : null);
     const actions = h('div', { class: 'image-actions' },
-      h('button', { class: 'btn primary', onclick: selectImage }, icon('upload'), custom ? 'Change image' : 'Select image'),
-      h('button', { class: 'btn danger', onclick: removeImage, disabled: custom ? false : 'disabled', title: 'Remove the custom image (falls back to the Windows wallpaper)' }, icon('trash'), 'Remove'));
+      h('button', { class: 'btn primary', onclick: selectImage }, icon('upload'), custom ? t('Change image') : t('Select image')),
+      h('button', { class: 'btn danger', onclick: removeImage, disabled: custom ? false : 'disabled', title: t('Remove the custom image (falls back to the Windows wallpaper)') }, icon('trash'), t('Remove')));
     imageCard.append(thumb, meta, actions);
   }
   renderImageCard(null);
@@ -289,66 +311,159 @@
 
   /* ----------------------------------------------- custom: presets panel */
   const presetBox = h('div');
+  const thumbs = new Map();     // preset name + image key -> data URL
+  let thumbEngine = null, thumbBusy = false;
+
+  /** Render a small still of each preset over the current background (offscreen WebGL). */
+  async function generateThumbs() {
+    if (thumbBusy) return;
+    thumbBusy = true;
+    try {
+      const todo = presets.filter((p) => !thumbs.has(p.name + '|' + settings.imageKey));
+      if (!todo.length) return;
+      if (!thumbEngine) {
+        const c = document.createElement('canvas');
+        c.width = 320; c.height = 180;
+        thumbEngine = new RainGlass.Engine(c, { audio: false, lightningSource: false, pixelRatio: 1 });
+        thumbEngine.imageKey = null;
+      }
+      if (thumbEngine.imageKey !== settings.imageKey) {
+        thumbEngine.imageKey = settings.imageKey;
+        const img = settings.imageKey && settings.imageKey !== 'none' ? await api.readImage() : null;
+        await thumbEngine.setBackgroundMedia(img);
+        thumbEngine.updateMedia(performance.now());
+      }
+      for (const p of todo) {
+        thumbEngine.setSettings({ ...DEFAULT_SETTINGS, ...settings, ...p.values, renderScale: 100, fpsLimit: 0 });
+        thumbEngine.sim.clear();
+        thumbEngine.sim.seed();
+        for (let i = 0; i < 150; i++) thumbEngine.sim.update(1 / 60);
+        thumbEngine.renderOnce();
+        thumbs.set(p.name + '|' + settings.imageKey, thumbEngine.canvas.toDataURL('image/jpeg', 0.82));
+        const el = presetBox.querySelector(`[data-thumb="${CSS.escape(p.name)}"]`);
+        if (el) el.style.backgroundImage = `url(${thumbs.get(p.name + '|' + settings.imageKey)})`;
+        await new Promise((r) => setTimeout(r, 0));
+      }
+    } catch (e) {
+      console.error('thumbnails', e);
+    } finally {
+      thumbBusy = false;
+    }
+  }
+
+  const errText = (e) => String(e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+
   function renderPresets() {
     presetBox.innerHTML = '';
-    const list = h('div', { class: 'preset-list' });
+    const grid = h('div', { class: 'preset-grid' });
     for (const p of presets) {
-      list.append(h('div', { class: 'preset' },
-        h('div', { class: 'preset-name' }, p.name),
-        p.builtin ? h('span', { class: 'preset-tag' }, 'Built-in') : null,
-        h('button', { class: 'btn small', onclick: async () => { applyRemote(await api.applyPreset(p.name)); toast(`Preset “${p.name}” loaded`); } }, 'Load'),
-        p.builtin ? null : h('button', { class: 'btn small danger', title: 'Delete', onclick: async () => { presets = await api.deletePreset(p.name); renderPresets(); } }, icon('trash'))));
+      const thumb = thumbs.get(p.name + '|' + settings.imageKey);
+      const load = async () => { applyRemote(await api.applyPreset(p.name)); toast(`${t('Preset loaded')}: ${p.name}`); };
+      grid.append(h('div', { class: 'preset-card' },
+        h('div', { class: 'preset-thumb', 'data-thumb': p.name, style: thumb ? `background-image:url(${thumb})` : '', onclick: load, title: t('Load') }),
+        h('div', { class: 'preset-meta' },
+          h('div', { class: 'preset-name' }, p.name),
+          p.builtin ? h('span', { class: 'preset-tag' }, t('Built-in')) : null),
+        h('div', { class: 'preset-actions' },
+          h('button', { class: 'btn small', onclick: load }, t('Load')),
+          h('button', { class: 'btn small ghost', title: t('Export'), onclick: async () => { try { if (await api.exportPreset(p.name)) toast(t('Preset exported')); } catch (e) { toast(errText(e), true); } } }, icon('export')),
+          p.builtin ? null : h('button', { class: 'btn small danger', title: t('Delete'), onclick: async () => { presets = await api.deletePreset(p.name); renderPresets(); } }, icon('trash')))));
     }
-    const name = h('input', { type: 'text', placeholder: 'Preset name', maxlength: 48 });
+    const name = h('input', { type: 'text', placeholder: t('Preset name'), maxlength: 48 });
     const save = async () => {
       try {
         await flush();
         presets = await api.savePreset(name.value);
+        thumbs.delete(name.value.trim() + '|' + settings.imageKey);
         renderPresets();
-        toast('Preset saved');
+        toast(t('Preset saved'));
       } catch (e) {
-        toast(String(e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), true);
+        toast(errText(e), true);
       }
     };
+    const importBtn = h('button', { class: 'btn', onclick: async () => {
+      try { const r = await api.importPresets(); if (r) { presets = r; renderPresets(); toast(t('Preset imported')); } } catch (e) { toast(errText(e), true); }
+    } }, icon('upload'), t('Import…'));
     name.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
     presetBox.append(
-      h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, 'Save current look'), h('div', { class: 'row' }, h('div', { class: 'preset-save' }, name, h('button', { class: 'btn primary', onclick: save }, icon('save'), 'Save')))),
-      h('div', { class: 'group-title', style: 'margin:4px 2px 8px' }, 'Library'), list);
+      h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, t('Save current look')),
+        h('div', { class: 'row' }, h('div', { class: 'preset-save' }, name, h('button', { class: 'btn primary', onclick: save }, icon('save'), t('Save')), importBtn))),
+      h('div', { class: 'group-title', style: 'margin:4px 2px 8px' }, t('Library')), grid);
+    if (document.querySelector('.section.active[data-id="presets"]')) generateThumbs();
   }
   renderPresets();
 
+  /* ---------------------------------------------- custom: live weather */
+  const weatherInfo = h('div', { class: 'row-hint', style: 'margin-top:8px' });
+  const cityInput = h('input', { type: 'text', placeholder: t('City, e.g. Bratislava'), maxlength: 80 });
+  const searchWeather = async () => {
+    if (!cityInput.value.trim()) return;
+    try {
+      applyRemote(await api.searchWeather(cityInput.value.trim()));
+      toast(t('Weather location set: ') + settings.weatherCity);
+    } catch (e) {
+      toast(String(e.message).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), true);
+    }
+  };
+  cityInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchWeather(); });
+  function renderWeather() {
+    cityInput.placeholder = settings.weatherCity || t('City, e.g. Bratislava');
+    const w = status.weather;
+    weatherInfo.textContent = !settings.weatherCity ? t('Rain intensity and thunder follow the real weather at your location (Open-Meteo).')
+      : w && w.error ? `${settings.weatherCity}: ${w.error}`
+      : w && w.text ? `${settings.weatherCity}: ${w.text}, ${Math.round(w.temp)} °C, ${w.precip} mm/h · ${t('updated')} ${new Date(w.time).toLocaleTimeString()}`
+      : settings.weatherCity;
+  }
+  const weatherBox = h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, t('Live weather')),
+    buildControl(toggle('weatherSync', t('Sync rain with real weather'), { hint: t('Updates every 15 minutes. Manual changes are overwritten on the next update.') })),
+    h('div', { class: 'row' }, h('div', { class: 'preset-save' }, cityInput, h('button', { class: 'btn primary', onclick: searchWeather }, t('Set location'))), weatherInfo));
+  renderWeather();
+
   /* ------------------------------------------------ custom: system extra */
+  const updateInfo = h('div', { class: 'row-hint' });
+  const updateBtn = h('button', { class: 'btn primary', style: 'display:none', onclick: () => api.installUpdate() }, t('Restart to update'));
+  function renderUpdate() {
+    const u = status.update || {};
+    const map = { unsupported: t('Automatic updates work in the installed version.'), checking: t('Checking for updates…'), latest: t('You have the latest version.'),
+      available: `${t('Downloading update')} ${u.version || ''}`, downloading: `${t('Downloading update')} ${u.percent || 0} %`, ready: `${t('Update ready')}: ${u.version}`, error: `${t('Update failed')}: ${u.error}` };
+    updateInfo.textContent = map[u.status] || '';
+    updateBtn.style.display = u.status === 'ready' ? '' : 'none';
+  }
   const monitorsBox = h('div');
   const perfBox = h('div', { class: 'info-row', style: 'padding:6px 0 10px' });
-  const MODES = { progman: 'Behind icons (Windows 11 24H2+)', classic: 'Behind icons (WorkerW)', failed: 'Failed – see log' };
+  const MODES = { progman: t('Behind icons (Windows 11 24H2+)'), classic: t('Behind icons (WorkerW)'), failed: t('Failed – see log') };
   function renderMonitors() {
     monitorsBox.innerHTML = '';
     const mode = status.attach && status.attach.mode;
-    if (mode) monitorsBox.append(h('div', { class: 'row-hint', style: 'margin:4px 0 6px' }, 'Desktop mode: ' + (MODES[mode] || mode)));
+    if (mode) monitorsBox.append(h('div', { class: 'row-hint', style: 'margin:4px 0 6px' }, t('Desktop mode: ') + (MODES[mode] || mode)));
     for (const d of status.displays || []) {
       monitorsBox.append(h('div', { class: 'monitor' }, icon('monitor'),
-        h('div', {}, h('b', {}, `${d.width} × ${d.height}`), ` · ${Math.round(d.scaleFactor * 100)}% · ${d.refreshRate} Hz${d.primary ? ' · Primary' : ''}${d.covered ? ' · paused (covered)' : ''}`)));
+        h('div', {}, h('b', {}, `${d.width} × ${d.height}`), ` · ${Math.round(d.scaleFactor * 100)}% · ${d.refreshRate} Hz${d.primary ? t(' · Primary') : ''}${d.covered ? t(' · paused (covered)') : ''}`)));
     }
     const m = status.metrics;
     if (m) {
       perfBox.innerHTML = '';
       perfBox.append(
-        h('span', { class: 'chip' }, 'Wallpaper FPS ', h('b', {}, String(status.fps || m.fpsAvg || '–'))),
-        h('span', { class: 'chip' }, 'CPU ', h('b', {}, m.cpu + ' %')),
-        h('span', { class: 'chip' }, 'RAM ', h('b', {}, m.memMB + ' MB')),
-        m.gpu ? h('span', { class: 'chip', title: m.gpu }, 'GPU ', h('b', {}, m.gpu.length > 38 ? m.gpu.slice(0, 38) + '…' : m.gpu)) : null);
+        h('span', { class: 'chip' }, t('Wallpaper FPS '), h('b', {}, String(status.fps || m.fpsAvg || '–'))),
+        h('span', { class: 'chip' }, t('CPU '), h('b', {}, m.cpu + ' %')),
+        h('span', { class: 'chip' }, t('RAM '), h('b', {}, m.memMB + ' MB')),
+        m.gpu ? h('span', { class: 'chip', title: m.gpu }, t('GPU '), h('b', {}, m.gpu.length > 38 ? m.gpu.slice(0, 38) + '…' : m.gpu)) : null);
     }
   }
   const systemExtra = h('div', {},
-    h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, 'Monitors'), monitorsBox),
-    h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, 'Live performance'), perfBox),
-    h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, 'Wallpaper Engine'),
+    h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, t('Monitors')), monitorsBox),
+    h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, t('Live performance')), perfBox),
+    h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, t('Wallpaper Engine')),
       h('div', { class: 'row' },
-        h('div', { class: 'row-hint', style: 'margin-bottom:10px' }, 'Export a web wallpaper project (with your image and current settings) that can be imported into Wallpaper Engine.'),
-        h('button', { class: 'btn', onclick: async () => { const out = await api.exportWallpaperEngine(); if (out) toast('Exported to ' + out); } }, icon('export'), 'Export project…'))),
-    h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, 'Diagnostics'),
-      h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => api.openLog() }, icon('export'), 'Open log file'))),
-    h('div', { class: 'nav-foot', style: 'display:block;padding:4px 2px' }, `Version ${state.version} · ${state.platform}`));
+        h('div', { class: 'row-hint', style: 'margin-bottom:10px' }, t('Export a web wallpaper project (with your image and current settings) that can be imported into Wallpaper Engine.')),
+        h('button', { class: 'btn', onclick: async () => { const out = await api.exportWallpaperEngine(); if (out) toast('Exported to ' + out); } }, icon('export'), t('Export project…')))),
+    h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, t('Updates')),
+      h('div', { class: 'row' }, updateInfo, h('div', { style: 'display:flex;gap:8px;margin-top:8px' },
+        h('button', { class: 'btn', onclick: () => api.checkUpdates() }, t('Check for updates')),
+        updateBtn))),
+    h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, t('Diagnostics')),
+      h('div', { class: 'row' }, h('button', { class: 'btn', onclick: () => api.openLog() }, icon('export'), t('Open log file')))),
+    h('div', { class: 'nav-foot', style: 'display:block;padding:4px 2px' }, `${t('Version')} ${state.version} · ${state.platform}`));
   renderMonitors();
 
   /* ------------------------------------------------------- build layout */
@@ -362,15 +477,17 @@
     if (sec.custom === 'presets') el.append(presetBox);
     for (const g of sec.groups) el.append(h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, g.title), g.items.map(buildControl)));
     if (sec.custom === 'system') el.append(systemExtra);
+    if (sec.custom === 'weather') el.append(weatherBox);
     panel.append(el);
   }
-  nav.append(h('div', { class: 'nav-spacer' }), h('div', { class: 'nav-foot' }, 'Double-click a slider to reset it'));
+  nav.append(h('div', { class: 'nav-spacer' }), h('div', { class: 'nav-foot' }, t('Double-click a slider to reset it')));
   refreshDependencies();
 
   function show(id) {
     for (const n of nav.querySelectorAll('.nav-item')) n.classList.toggle('active', n.dataset.id === id);
     for (const s of panel.querySelectorAll('.section')) s.classList.toggle('active', s.dataset.id === id);
     try { localStorage.setItem('tab', id); } catch { /* ignore */ }
+    if (id === 'presets') generateThumbs();
   }
   let initialTab = 'background';
   try { initialTab = localStorage.getItem('tab') || initialTab; } catch { /* ignore */ }
@@ -380,7 +497,7 @@
   const btnPause = $('#btnPause');
   function renderPause() {
     btnPause.innerHTML = '';
-    btnPause.append(icon(paused ? 'play' : 'pause'), h('span', {}, paused ? 'Resume rain' : 'Pause rain'));
+    btnPause.append(icon(paused ? 'play' : 'pause'), h('span', {}, paused ? t('Resume rain') : t('Pause rain')));
   }
   btnPause.addEventListener('click', () => { paused = !paused; engine && engine.setPaused(paused); renderPause(); api.setPaused(paused); });
   $('#btnResetRain').addEventListener('click', () => { engine && engine.reset(); api.resetRain(); });
@@ -397,21 +514,21 @@
     const el = $('#status');
     el.className = 'status';
     let text;
-    if (status.attach && status.attach.mode === 'failed') { el.classList.add('error'); text = 'Desktop attach failed'; el.title = status.attach.error || ''; }
-    else if (status.error) { el.classList.add('error'); text = 'Wallpaper error'; el.title = status.error; }
-    else if (!status.enabled) text = 'Wallpaper off';
-    else if (status.suspended) { el.classList.add('suspended'); text = 'Sleeping · ' + ({ fullscreen: 'fullscreen app', battery: 'on battery', locked: 'locked', sleep: 'system sleep' }[status.reason] || 'paused'); }
-    else if (paused) { el.classList.add('paused'); text = 'Paused'; }
-    else { el.classList.add('live'); text = 'Live' + (status.fps ? ` · ${status.fps} FPS` : ''); }
+    if (status.attach && status.attach.mode === 'failed') { el.classList.add('error'); text = t('Desktop attach failed'); el.title = status.attach.error || ''; }
+    else if (status.error) { el.classList.add('error'); text = t('Wallpaper error'); el.title = status.error; }
+    else if (!status.enabled) text = t('Wallpaper off');
+    else if (status.suspended) { el.classList.add('suspended'); text = t('Sleeping · ') + t({ fullscreen: 'fullscreen app', battery: 'on battery', locked: 'locked', sleep: 'system sleep' }[status.reason] || 'paused'); }
+    else if (paused) { el.classList.add('paused'); text = t('Paused'); }
+    else { el.classList.add('live'); text = t('Live') + (status.fps ? ` · ${status.fps} FPS` : ''); }
     $('#statusText').textContent = text;
 
     const info = $('#infoRow');
     info.innerHTML = '';
     const n = (status.displays || []).length;
     info.append(
-      h('span', { class: 'chip' }, 'Monitors ', h('b', {}, String(n))),
-      h('span', { class: 'chip' }, 'Preview ', h('b', {}, engine ? `${engine.fps || '–'} FPS` : 'off')),
-      h('span', { class: 'chip' }, 'Drops ', h('b', {}, engine ? String(engine.sim.drops.length) : '–')));
+      h('span', { class: 'chip' }, t('Monitors '), h('b', {}, String(n))),
+      h('span', { class: 'chip' }, t('Preview '), h('b', {}, engine ? `${engine.fps || '–'} FPS` : 'off')),
+      h('span', { class: 'chip' }, t('Drops '), h('b', {}, engine ? String(engine.sim.drops.length) : '–')));
   }
   renderStatus();
   setInterval(renderStatus, 1000);
@@ -419,7 +536,11 @@
   /* -------------------------------------------------------------- events */
   api.onSettings((s) => applyRemote(s));
   api.onPause((p) => { paused = p; engine && engine.setPaused(p); renderPause(); renderStatus(); });
-  api.onStatus((s) => { status = s; renderStatus(); renderMonitors(); });
+  api.onStatus((s) => { status = s; renderStatus(); renderMonitors(); renderWeather(); renderUpdate(); });
+  renderUpdate();
+
+  // Mouse over the preview wipes the glass too.
+  canvas.addEventListener('pointermove', (e) => engine && engine.pointer(e.offsetX, e.offsetY));
 
   // Pause the preview while the window is hidden/minimised.
   document.addEventListener('visibilitychange', () => engine && engine.setSuspended(document.hidden));

@@ -78,6 +78,9 @@
           enabled: !!this.settings.soundEnabled,
           volume: (this.settings.volume ?? 50) / 100,
           intensity: (this.settings.rainIntensity ?? 50) / 100,
+          soundscape: this.settings.soundscape,
+          wind: !!this.settings.windEnabled,
+          windVolume: (this.settings.windVolume ?? 40) / 100,
         });
       }
       if (!this.running || this.paused || this.suspended) this.renderOnce();
@@ -221,6 +224,22 @@
       if (this.audio) this.audio.setSuspended(s);
       this.syncMediaPlayback();
       if (!s) this._resumeLoop();
+    }
+
+    /**
+     * Pointer interaction (CSS pixels relative to the canvas). Moving over the
+     * glass wipes condensation and tiny droplets like a finger.
+     */
+    pointer(x, y) {
+      if (this.settings.mouseInteraction === false) return;
+      const cw = this.canvas.clientWidth || 1, ch = this.canvas.clientHeight || 1;
+      const sx = (x / cw) * this.sim.width, sy = (y / ch) * this.sim.height;
+      const last = this._pointer;
+      this._pointer = { x: sx, y: sy, t: performance.now() };
+      if (!last || performance.now() - last.t > 250) return; // first sample after a pause
+      if (Math.hypot(sx - last.x, sy - last.y) < 0.5) return;
+      this.sim.touch(last.x, last.y, sx, sy, 9);
+      if (this.paused || !this.running) this.renderOnce();
     }
 
     /** Desktop hidden behind windows: stop drawing but keep the ambience playing. */

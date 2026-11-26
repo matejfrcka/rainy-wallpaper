@@ -47,6 +47,17 @@
     thunderEnabled: false,
     lightning: true,
     dayNight: 50,              // 0 = deep night, 50 = neutral, 100 = warm day
+    autoDayNight: false,       // follow the sun (location from weather or time zone)
+    soundscape: 'window',      // 'window' | 'roof' | 'leaves' | 'car'
+    windEnabled: false,
+    windVolume: 40,
+
+    // Interaction & weather
+    mouseInteraction: true,    // cursor over the desktop wipes condensation
+    weatherSync: false,        // drive rain/thunder from the real weather
+    weatherCity: '',
+    weatherLat: 0,
+    weatherLon: 0,
 
     // Performance / system
     fpsLimit: 60,              // 30 | 60 | 144(0 = vsync)
@@ -56,6 +67,9 @@
     pauseOnBattery: false,
     startWithWindows: false,
     wallpaperEnabled: true,
+    hotkeysEnabled: true,      // Ctrl+Alt+R pause, Ctrl+Alt+W wallpaper on/off
+    autoUpdate: true,
+    language: 'auto',          // 'auto' | 'en' | 'sk'
   });
 
   // Numeric ranges used for clamping / validation and by the UI.
@@ -65,16 +79,18 @@
     trailLength: [0, 100], refraction: [0, 100], distortion: [0, 100], chromatic: [0, 100],
     glassTransparency: [0, 100], reflection: [0, 100], condensation: [0, 100], blur: [0, 100],
     streaks: [0, 100], volume: [0, 100], dayNight: [0, 100], fpsLimit: [0, 240], renderScale: [50, 100],
+    windVolume: [0, 100], weatherLat: [-90, 90], weatherLon: [-180, 180],
   };
 
-  const ENUMS = { fitMode: ['fill', 'fit', 'stretch'] };
+  const ENUMS = { fitMode: ['fill', 'fit', 'stretch'], soundscape: ['window', 'roof', 'leaves', 'car'], language: ['auto', 'en', 'sk'] };
+  const STRINGS = { weatherCity: 80 };
 
   // Keys that describe the "look" (presets store only these, never the image or system options).
   const PRESET_KEYS = [
     'rainIntensity', 'dropletDensity', 'dropletSize', 'dropletSpeed', 'trailLength', 'merging',
     'randomGeneration', 'refraction', 'distortion', 'chromatic', 'glassTransparency', 'reflection',
     'condensationEnabled', 'condensation', 'blur', 'streaksEnabled', 'streaks', 'soundEnabled', 'volume',
-    'thunderEnabled', 'lightning', 'dayNight', 'bgBrightness', 'bgBlur',
+    'thunderEnabled', 'lightning', 'dayNight', 'bgBrightness', 'bgBlur', 'soundscape', 'windEnabled', 'windVolume',
   ];
 
   const BUILTIN_PRESETS = [
@@ -101,11 +117,12 @@
       const val = input[key];
       if (key === 'backgroundPath') out[key] = typeof val === 'string' && val.length ? val : null;
       else if (ENUMS[key]) out[key] = ENUMS[key].includes(val) ? val : def;
+      else if (STRINGS[key]) out[key] = typeof val === 'string' ? val.slice(0, STRINGS[key]) : def;
       else if (typeof def === 'boolean') out[key] = Boolean(val);
       else if (typeof def === 'number') out[key] = clampNumber(val, RANGES[key] || [-Infinity, Infinity], def);
     }
     return out;
   }
 
-  return { DEFAULT_SETTINGS, RANGES, ENUMS, PRESET_KEYS, BUILTIN_PRESETS, sanitize };
+  return { DEFAULT_SETTINGS, RANGES, ENUMS, STRINGS, PRESET_KEYS, BUILTIN_PRESETS, sanitize };
 });

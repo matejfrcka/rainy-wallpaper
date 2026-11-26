@@ -35,6 +35,18 @@
     return buf;
   }
 
+  /**
+   * Soundscapes: filter tuning of the three noise layers and of the
+   * droplet ticks. [hissHP, hissLP, bodyLP, patterBP, patterQ,
+   * tickFreqMin, tickFreqMax, tickQMin, tickQMax, tickDecay, tickAmp, gains{hiss,body,patter}]
+   */
+  const PROFILES = {
+    window: { hiss: [400, 7500], body: 900, patter: [1800, 0.8], tick: [1800, 6800, 4, 10, 0.03, 1], gain: [1, 1, 1] },
+    roof:   { hiss: [250, 5000], body: 600, patter: [900, 2.0], tick: [500, 2600, 9, 22, 0.12, 1.6], gain: [0.8, 1.5, 1.3] },
+    leaves: { hiss: [1200, 9500], body: 1200, patter: [3200, 0.6], tick: [2500, 8500, 1, 3, 0.02, 0.6], gain: [1.4, 0.5, 1.2] },
+    car:    { hiss: [150, 1800], body: 400, patter: [700, 1.2], tick: [250, 1200, 2, 5, 0.06, 1.8], gain: [0.6, 1.7, 1.1] },
+  };
+
   class RainAudio {
     constructor() {
       this.ctx = null;
@@ -42,6 +54,9 @@
       this.volume = 0.5;
       this.intensity = 0.5;
       this.suspended = false;
+      this.profile = PROFILES.window;
+      this.wind = false;
+      this.windVolume = 0.4;
     }
 
     ensure() {
@@ -63,6 +78,9 @@
       this.body = this.loop(this.brown, [['lowpass', 900, 0.7]]);
       // Layer 3: mid "patter" band, slowly modulated.
       this.patter = this.loop(this.pink, [['bandpass', 1800, 0.8]]);
+      // Layer 4: wind – band-passed brown noise with a wandering centre frequency.
+      this.windLayer = this.loop(this.brown, [['bandpass', 400, 1.2]]);
+      this.windTimer = setInterval(() => this.gust(), 2500);
       this.lfo = ctx.createOscillator();
       this.lfo.frequency.value = 0.07;
       const lfoGain = ctx.createGain();
@@ -82,16 +100,18 @@
       src.loopStart = 0;
       src.loopEnd = buffer.duration;
       let node = src;
+      this._lastFilters = [];
       for (const [type, freq, q] of filters) {
         const f = ctx.createBiquadFilter();
         f.type = type; f.frequency.value = freq; f.Q.value = q;
         node.connect(f); node = f;
+        this._lastFilters.push(f);
       }
       const gain = ctx.createGain();
       gain.gain.value = 0;
       node.connect(gain).connect(this.master);
       src.start(0, Math.random() * buffer.duration);
-      return { src, gain };
+      return { src, gain, filters: node === src ? [] : this._lastFilters };
     }
 
     applyLevels(ramp = 0.6) {
@@ -100,9 +120,27 @@
       const i = this.intensity;
       const on = this.enabled && !this.suspended;
       this.master.gain.setTargetAtTime(on ? this.volume * 0.9 : 0, t, ramp);
-      this.hiss.gain.gain.setTargetAtTime(0.12 + i * 0.45, t, ramp);
-      this.body.gain.gain.setTargetAtTime(0.05 + i * i * 0.6, t, ramp);
-      this.patter.gain.gain.setTargetAtTime(0.06 + i * 0.25, t, ramp);
+      const P = this.profile, g = P.gain;
+      this.hiss.gain.gain.setTargetAtTime((0.12 + i * 0.45) * g[0], t, ramp);
+      this.body.gain.gain.setTargetAtTime((0.05 + i * i * 0.6) * g[1], t, ramp);
+      this.patter.gain.gain.setTargetAtTime((0.06 + i * 0.25) * g[2], t, ramp);
+      const [hp, lp] = this.hiss.filters;
+      hp.frequency.setTargetAtTime(P.hiss[0], t, ramp);
+      lp.frequency.setTargetAtTime(P.hiss[1], t, ramp);
+      this.body.filters[0].frequency.setTargetAtTime(P.body, t, ramp);
+      this.patter.filters[0].frequency.setTargetAtTime(P.patter[0], t, ramp);
+      this.patter.filters[0].Q.setTargetAtTime(P.patter[1], t, ramp);
+      this.windLayer.gain.gain.setTargetAtTime(this.wind ? this.windVolume * 0.9 : 0, t, ramp * 2);
+    }
+
+    /** Wind gusts: wander the band centre and level. */
+    gust() {
+      if (!this.ctx || !this.wind) return;
+      const t = this.ctx.currentTime;
+      const f = this.windLayer.filters[0];
+      f.frequency.setTargetAtTime(180 + Math.random() * 650, t, 1.5);
+      f.Q.setTargetAtTime(0.8 + Math.random() * 2, t, 1.5);
+      this.windLayer.gain.gain.setTargetAtTime(this.windVolume * (0.4 + Math.random() * 0.9), t, 1.2);
     }
 
     /** Short droplet impacts on the glass, randomly panned. */
@@ -114,20 +152,21 @@
         const t = ctx.currentTime + 0.05 + Math.random() * 0.1;
         const src = ctx.createBufferSource();
         src.buffer = this.white;
+        const [fMin, fMax, qMin, qMax, decay, ampK] = this.profile.tick;
         const bp = ctx.createBiquadFilter();
         bp.type = 'bandpass';
-        bp.frequency.value = 1800 + Math.random() * 5000;
-        bp.Q.value = 4 + Math.random() * 6;
+        bp.frequency.value = fMin + Math.random() * (fMax - fMin);
+        bp.Q.value = qMin + Math.random() * (qMax - qMin);
         const g = ctx.createGain();
-        const amp = 0.04 + Math.random() * 0.12;
+        const amp = (0.04 + Math.random() * 0.12) * ampK;
         g.gain.setValueAtTime(0, t);
         g.gain.linearRampToValueAtTime(amp, t + 0.002);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.02 + Math.random() * 0.04);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + decay + Math.random() * decay);
         const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
         let node = src.connect(bp).connect(g);
         if (pan) { pan.pan.value = Math.random() * 2 - 1; node = node.connect(pan); }
         node.connect(this.master);
-        src.start(t, Math.random() * 0.9, 0.08);
+        src.start(t, Math.random() * 0.7, 0.3);
         src.onended = () => src.disconnect();
       }
     }
@@ -160,7 +199,10 @@
       src.onended = () => { src.disconnect(); lp.disconnect(); g.disconnect(); };
     }
 
-    setOptions({ enabled, volume, intensity }) {
+    setOptions({ enabled, volume, intensity, soundscape, wind, windVolume }) {
+      if (soundscape !== undefined) this.profile = PROFILES[soundscape] || PROFILES.window;
+      if (wind !== undefined) this.wind = !!wind;
+      if (windVolume !== undefined) this.windVolume = windVolume;
       if (enabled !== undefined) this.enabled = enabled;
       if (volume !== undefined) this.volume = volume;
       if (intensity !== undefined) this.intensity = intensity;
@@ -181,6 +223,7 @@
 
     destroy() {
       clearInterval(this.tickTimer);
+      clearInterval(this.windTimer);
       if (this.ctx) this.ctx.close().catch(() => {});
       this.ctx = null;
     }
