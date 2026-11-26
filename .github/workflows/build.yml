@@ -1,0 +1,56 @@
+name: Build Windows
+
+# Builds the installer, portable exe and Microsoft Store package on Windows.
+# Pushing a tag like v1.1.0 also publishes a GitHub Release, which is what the
+# in-app auto-updater downloads from.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+
+      # Code signing (optional): add the repository secrets
+      #   WIN_CSC_LINK          – base64 of the .pfx certificate (or an https URL)
+      #   WIN_CSC_KEY_PASSWORD  – its password
+      # Without them the build is unsigned.
+      - name: Build installer + portable
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: npx electron-builder --win nsis portable --x64 --publish ${{ startsWith(github.ref, 'refs/tags/v') && 'always' || 'never' }}
+
+      # Store package: Microsoft signs it when you submit it in Partner Center.
+      # Set the identity from Partner Center → Product identity as repository variables.
+      - name: Build Microsoft Store package (MSIX)
+        if: ${{ vars.APPX_IDENTITY_NAME != '' }}
+        run: >
+          npx electron-builder --win appx --x64 --publish never
+          -c.appx.identityName="${{ vars.APPX_IDENTITY_NAME }}"
+          -c.appx.publisher="${{ vars.APPX_PUBLISHER }}"
+          -c.appx.publisherDisplayName="${{ vars.APPX_PUBLISHER_DISPLAY_NAME }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rainy-glass-windows
+          path: |
+            dist/*.exe
+            dist/*.appx
+            dist/latest.yml
+          if-no-files-found: warn

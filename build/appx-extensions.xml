@@ -1,0 +1,3 @@
+        <desktop:Extension Category="windows.startupTask" Executable="app\Rainy Glass Wallpaper Engine.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="RainyGlassStartup" Enabled="false" DisplayName="Rainy Glass Wallpaper Engine" />
+        </desktop:Extension>
