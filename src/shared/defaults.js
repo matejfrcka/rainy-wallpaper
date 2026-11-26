@@ -81,6 +81,8 @@
     screensaverEnabled: false, // rain screensaver after inactivity
     screensaverMinutes: 10,
     screensaverClock: true,
+    screensaverRain: true,     // weather shown by the screensaver; both ticked = take turns
+    screensaverSnow: false,
     scheduleEnabled: false,    // time-of-day schedule (see `schedule`)
     schedule: [],              // [{ time: 'HH:MM', preset: name|'', image: path|'' }]
     pauseApps: '',

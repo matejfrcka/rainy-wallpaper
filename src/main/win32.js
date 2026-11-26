@@ -322,15 +322,17 @@ function isLeftMouseDown() {
   }
 }
 
-const MEDIA_KEYS = { playpause: 0xB3, next: 0xB0, prev: 0xB1 };
+const MEDIA_KEYS = { playpause: 0xB3, next: 0xB0, prev: 0xB1, voldown: 0xAE, volup: 0xAF, mute: 0xAD };
 /** Press a media key – every player that listens to media keys (Spotify, browsers, VLC …) reacts. */
-function sendMediaKey(cmd) {
+function sendMediaKey(cmd, times = 1) {
   const a = load();
   const vk = MEDIA_KEYS[cmd];
   if (!a || !vk) return false;
   try {
-    a.keybd_event(vk, 0, 1 /* EXTENDEDKEY */, 0);
-    a.keybd_event(vk, 0, 1 | 2 /* KEYUP */, 0);
+    for (let i = 0; i < times; i++) {
+      a.keybd_event(vk, 0, 1 /* EXTENDEDKEY */, 0);
+      a.keybd_event(vk, 0, 1 | 2 /* KEYUP */, 0);
+    }
     return true;
   } catch {
     return false;

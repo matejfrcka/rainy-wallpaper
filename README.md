@@ -34,7 +34,7 @@ The app has two separate layers:
 - **Schedule**: a different preset and image for each time of day, for example a foggy morning and a storm at night.
 - **Pause rules for apps**: the wallpaper pauses while a listed program (for example `photoshop.exe`) is in front.
 - **Music reactivity**: lights behind the glass pulse with whatever plays on the PC, and strong beats can trigger lightning (Windows system audio).
-- **Desktop widget**: a glass card on the desktop with a clock and the song that is playing (Spotify, browser, other players).
+- **Desktop widget**: a glass card on the desktop with a clock and the song that is playing (Spotify, browser, other players), with play/pause, next/previous and volume buttons. Long titles scroll.
 - **Span across monitors**: one image stretched over all monitors.
 - **Razer Chroma**: keyboard, mouse and headset glow rain blue and flash white with every lightning strike (needs Razer Synapse).
 - **See-through taskbar**: clear, blurred or frosted, with white clock and icons. The taskbar keeps the look Windows gives it unless you change this.

@@ -171,7 +171,9 @@
           { type: 'text', key: 'pauseApps', label: t('Pause for these apps'), placeholder: 'photoshop.exe, premiere.exe', hint: t('Comma separated program names. The wallpaper pauses while one of them is in front.') },
         ] },
         { title: t('Screensaver'), items: [
-          toggle('screensaverEnabled', t('Rain screensaver')),
+          toggle('screensaverEnabled', t('Turn on screensaver')),
+          toggle('screensaverRain', t('Rain'), { dependsOn: 'screensaverEnabled' }),
+          toggle('screensaverSnow', t('Snow'), { dependsOn: 'screensaverEnabled', hint: t('Tick both and rain and snow take turns.') }),
           slider('screensaverMinutes', t('Start after'), { min: 1, max: 120, unit: ' min', dependsOn: 'screensaverEnabled' }),
           toggle('screensaverClock', t('Show clock'), { dependsOn: 'screensaverEnabled' }),
           { type: 'button', label: t('Try screensaver'), onClick: () => api.testScreensaver() },

@@ -398,12 +398,12 @@ function startPointer() {
 /** Play/pause, next or previous track in whatever player Windows' media controls point at. */
 let lastMediaCmd = { cmd: '', at: 0 };
 function mediaCommand(cmd) {
-  if (!['playpause', 'next', 'prev'].includes(cmd)) return;
+  if (!['playpause', 'next', 'prev', 'voldown', 'volup', 'mute'].includes(cmd)) return;
   const now = Date.now();
-  if (lastMediaCmd.cmd === cmd && now - lastMediaCmd.at < 400) return; // DOM click + desktop click for the same press
+  if (lastMediaCmd.cmd === cmd && now - lastMediaCmd.at < 200) return; // DOM click + desktop click for the same press
   lastMediaCmd = { cmd, at: now };
   if (process.platform !== 'win32') { log('media: ' + cmd + ' (Windows only)'); return; }
-  win32.sendMediaKey(cmd);
+  win32.sendMediaKey(cmd, cmd === 'voldown' || cmd === 'volup' ? 3 : 1); // one volume key = 2 %, a click = 6 %
   if (cmd === 'playpause' && mediaInfo) { // instant feedback; the next media poll confirms it
     mediaInfo = { ...mediaInfo, playing: !mediaInfo.playing };
     wallpapers.broadcast('widget:media', mediaInfo);

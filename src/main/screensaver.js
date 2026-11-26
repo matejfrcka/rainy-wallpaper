@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Rain screensaver: after N idle minutes, opens a topmost full-screen rain
+ * Rain / snow screensaver: after N idle minutes, opens a topmost full-screen rain
  * window on every monitor (with an optional clock). Any input closes it.
  * Not started while a fullscreen app, video or presentation is running.
  */
@@ -43,6 +43,10 @@ class Screensaver {
   show() {
     if (this.active) return;
     this.startedAt = Date.now();
+    const s = this.getSettings();
+    const kinds = [s.screensaverRain && 'rain', s.screensaverSnow && 'snow'].filter(Boolean);
+    if (kinds.length > 1) this.turn = (this.turn || 0) + 1; // both ticked: take turns
+    const weather = kinds.length ? kinds[(this.turn || 0) % kinds.length] : '';
     const primary = screen.getPrimaryDisplay().id;
     for (const d of screen.getAllDisplays()) {
       const win = new BrowserWindow({
@@ -61,7 +65,7 @@ class Screensaver {
       win.setMenu(null);
       win.setAlwaysOnTop(true, 'screen-saver');
       win.loadFile(path.join(__dirname, '..', 'renderer', 'screensaver', 'index.html'), {
-        query: { display: String(d.id), primary: d.id === primary ? '1' : '0' },
+        query: { display: String(d.id), primary: d.id === primary ? '1' : '0', weather },
       });
       win.once('ready-to-show', () => {
         win.setBounds(d.bounds);
@@ -72,7 +76,7 @@ class Screensaver {
       win.on('closed', () => { this.windows = this.windows.filter((w) => w !== win); });
       this.windows.push(win);
     }
-    this.log('screensaver: started');
+    this.log('screensaver: started' + (weather ? ` (${weather})` : ''));
   }
 
   stop() {

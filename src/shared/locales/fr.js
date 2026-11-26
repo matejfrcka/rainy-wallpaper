@@ -211,6 +211,8 @@
   "Ice crystals grow from the window frame. Wipe them with the mouse.": "Des cristaux de glace poussent depuis le cadre de la fenêtre. Essuie-les avec la souris.",
   "Pause for these apps": "Mettre en pause pour ces applications",
   "Comma separated program names. The wallpaper pauses while one of them is in front.": "Noms de programmes séparés par des virgules. Le fond d'écran se met en pause tant que l'un d'eux est au premier plan.",
+  "Turn on screensaver": "Activer l'économiseur d'écran",
+  "Tick both and rain and snow take turns.": "Coche les deux et la pluie et la neige alternent.",
   "Screensaver": "Économiseur d'écran",
   "Rain screensaver": "Économiseur d'écran pluie",
   "Start after": "Démarrer après",

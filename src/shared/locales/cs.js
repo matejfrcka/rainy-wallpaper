@@ -211,6 +211,8 @@
   "Ice crystals grow from the window frame. Wipe them with the mouse.": "Ledové krystaly rostou od rámu okna. Setřeš je myší.",
   "Pause for these apps": "Pozastavit pro tyto aplikace",
   "Comma separated program names. The wallpaper pauses while one of them is in front.": "Názvy programů oddělené čárkou. Tapeta se pozastaví, když je některý z nich v popředí.",
+  "Turn on screensaver": "Zapnout spořič obrazovky",
+  "Tick both and rain and snow take turns.": "Když zaškrtneš obojí, déšť a sníh se budou střídat.",
   "Screensaver": "Spořič obrazovky",
   "Rain screensaver": "Deštivý spořič obrazovky",
   "Start after": "Spustit po",

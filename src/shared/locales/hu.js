@@ -211,6 +211,8 @@
   "Ice crystals grow from the window frame. Wipe them with the mouse.": "Jégkristályok nőnek az ablakkerettől. Töröld le őket az egérrel.",
   "Pause for these apps": "Szüneteltetés ezeknél az alkalmazásoknál",
   "Comma separated program names. The wallpaper pauses while one of them is in front.": "Vesszővel elválasztott programnevek. A háttér szünetel, amíg valamelyik előtérben van.",
+  "Turn on screensaver": "Képernyővédő bekapcsolása",
+  "Tick both and rain and snow take turns.": "Ha mindkettőt bejelölöd, az eső és a hó váltakozik.",
   "Screensaver": "Képernyővédő",
   "Rain screensaver": "Esős képernyővédő",
   "Start after": "Indítás ennyi idő után",

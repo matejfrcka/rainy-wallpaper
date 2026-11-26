@@ -104,6 +104,7 @@
     'Depth parallax': 'Hĺbková paralaxa', 'The background moves slightly with the cursor, like looking through a real window.': 'Pozadie sa jemne posúva s kurzorom, ako keď pozeráš cez skutočné okno.',
     'Weather': 'Počasie', 'Snow': 'Sneh', 'Frost': 'Námraza', 'Ice crystals grow from the window frame. Wipe them with the mouse.': 'Ľadové kryštály rastú od rámu okna. Zotrieš ich myšou.',
     'Pause for these apps': 'Pozastaviť pre tieto aplikácie', 'Comma separated program names. The wallpaper pauses while one of them is in front.': 'Názvy programov oddelené čiarkou. Tapeta sa pozastaví, keď je niektorý z nich v popredí.',
+    'Turn on screensaver': 'Zapnúť šetrič obrazovky', 'Tick both and rain and snow take turns.': 'Keď zaškrtneš oboje, dážď a sneh sa budú striedať.',
     'Screensaver': 'Šetrič obrazovky', 'Rain screensaver': 'Dažďový šetrič obrazovky', 'Start after': 'Spustiť po', 'Show clock': 'Zobraziť hodiny', 'Try screensaver': 'Vyskúšať šetrič',
     'Sleep timer': 'Časovač spánku', 'Turn off sound after': 'Vypnúť zvuk po', 'Off': 'Vyp', 'Sound fades out in': 'Zvuk stíchne o',
     'The rain sound slowly fades out and turns off.': 'Zvuk dažďa postupne stíchne a vypne sa.',

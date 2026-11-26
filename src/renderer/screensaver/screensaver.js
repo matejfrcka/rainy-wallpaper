@@ -1,17 +1,19 @@
-/* Screensaver window: rain over the monitor's background + optional clock. Any input exits. */
+/* Screensaver window: rain or snow over the monitor's background + optional clock. Any input exits. */
 (async function () {
   'use strict';
   const api = window.rainApi;
   const params = new URLSearchParams(location.search);
   const displayId = Number(params.get('display')) || null;
   const isPrimary = params.get('primary') === '1';
+  const weather = params.get('weather'); // 'rain' | 'snow' | '' (= same as the wallpaper)
+  const own = (s) => ({ ...s, mouseInteraction: false, ...(weather ? { precipitation: weather } : {}) });
 
   const engine = new RainGlass.Engine(document.getElementById('glass'), { audio: false, lightningSource: isPrimary });
   const state = await api.getState();
-  engine.setSettings({ ...state.settings, mouseInteraction: false });
+  engine.setSettings(own(state.settings));
   try { await engine.setBackgroundMedia(await api.readImage(displayId)); } catch { /* gradient */ }
   engine.start();
-  api.onSettings((s) => engine.setSettings({ ...s, mouseInteraction: false }));
+  api.onSettings((s) => engine.setSettings(own(s)));
 
   // Clock
   const clock = document.getElementById('clock');
