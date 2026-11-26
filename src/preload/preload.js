@@ -21,6 +21,9 @@ contextBridge.exposeInMainWorld('rainApi', {
   selectImage: () => ipcRenderer.invoke('image:select'),
   setImagePath: (p) => ipcRenderer.invoke('image:set', p),
   removeImage: () => ipcRenderer.invoke('image:remove'),
+  galleryList: () => ipcRenderer.invoke('gallery:list'),
+  setGallery: (ref) => ipcRenderer.invoke('gallery:set', ref),
+  onGalleryProgress: on('gallery:progress'),
   readImage: (displayId) => ipcRenderer.invoke('image:read', displayId),
   pathForFile: (file) => { try { return webUtils.getPathForFile(file); } catch { return null; } },
 

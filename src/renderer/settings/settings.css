@@ -331,3 +331,6 @@ input[type=text]:focus { border-color: var(--accent); }
 .select { flex: 1; min-width: 0; }
 .select option { background: #161a21; }
 .time-input::-webkit-calendar-picker-indicator { filter: invert(0.8); }
+
+.preset-card.active { border-color: rgba(90,169,255,0.7); box-shadow: 0 0 0 1px rgba(90,169,255,0.35); }
+.preset-actions .btn svg { width: 12px; height: 12px; }

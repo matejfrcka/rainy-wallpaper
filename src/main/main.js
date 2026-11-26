@@ -16,6 +16,7 @@ const weather = require('./weather');
 const i18n = require('../shared/i18n');
 const updater = require('./updater');
 const { Screensaver } = require('./screensaver');
+const gallery = require('./gallery-manager');
 const t = (x) => i18n.t(x);
 const win32 = require('./win32');
 
@@ -64,6 +65,13 @@ function resolveImage() {
   const all = screen.getAllDisplays();
   const primaryId = screen.getPrimaryDisplay().id;
   const stamp = (p) => { try { const st = fs.statSync(p); return `${st.mtimeMs}|${st.size}`; } catch { return '0'; } };
+  const g = gallery.parse(s.backgroundPath);
+  if (g) {
+    const file = gallery.resolve(s.backgroundPath);
+    const scene = gallery.list().find((x) => x.id === g.id);
+    const displays = Object.fromEntries(all.map((d) => [d.id, file]));
+    return { key: `custom|${s.backgroundPath}|${file}|${stamp(file)}`, source: 'custom', gallery: g.id, path: file, name: scene.name, displays };
+  }
   if (s.backgroundPath) {
     const displays = Object.fromEntries(all.map((d) => [d.id, s.backgroundPath]));
     return { key: `custom|${s.backgroundPath}|${stamp(s.backgroundPath)}`, source: 'custom', path: s.backgroundPath, name: path.basename(s.backgroundPath), displays };
@@ -170,8 +178,11 @@ function runSchedule(force = false) {
   try {
     if (active.preset) applyPresetByName(active.preset);
     if (active.image) {
-      images.validate(active.image);
-      applySettings({ backgroundPath: active.image });
+      if (gallery.parse(active.image)) setGallery(active.image, false).catch((e) => log('schedule gallery: ' + e.message));
+      else {
+        images.validate(active.image);
+        applySettings({ backgroundPath: active.image });
+      }
     }
   } catch (e) {
     log('schedule error: ' + e.message);
@@ -181,6 +192,21 @@ function runSchedule(force = false) {
 function startScheduler() {
   runSchedule(true);
   setInterval(() => runSchedule(), 30 * 1000);
+}
+
+/* --------------------------------------------------------------- gallery */
+
+/** Use a gallery scene; downloads its animated loop first when needed. */
+async function setGallery(ref, matchLook = store.get().galleryMatchLook) {
+  const g = gallery.parse(ref);
+  if (!g) throw new Error('Unknown gallery scene');
+  if (g.video) {
+    await gallery.downloadVideo(g.id, (p) => sendToSettings('gallery:progress', { id: g.id, progress: p }));
+    sendToSettings('gallery:progress', { id: g.id, progress: 1 });
+  }
+  const scene = gallery.list().find((x) => x.id === g.id);
+  if (matchLook && scene.preset) applyPresetByName(scene.preset);
+  return applySettings({ backgroundPath: ref });
 }
 
 /* --------------------------------------------------------------- hotkeys */
@@ -323,7 +349,7 @@ function init() {
 
   // A missing image (moved / deleted) falls back to the neutral background.
   const s = store.get();
-  if (s.backgroundPath) {
+  if (s.backgroundPath && !gallery.parse(s.backgroundPath)) {
     try { images.validate(s.backgroundPath); } catch { store.update({ backgroundPath: null }); }
   }
 
@@ -520,7 +546,7 @@ function registerIpc() {
     const img = currentImage;
     const file = imagePathFor(displayId);
     if (!file) return null;
-    const meta = { name: img.name, path: file, source: img.source, key: img.key };
+    const meta = { name: img.name, path: file, source: img.source, key: img.key, gallery: img.gallery || null };
     if (images.isVideo(file)) {
       // Videos are streamed through rainmedia:// instead of copied over IPC.
       return { ...meta, kind: 'video', mime: images.mimeOf(file), url: `rainmedia://media/${displayId || 'primary'}?k=${encodeURIComponent(img.key)}` };
@@ -594,6 +620,9 @@ function registerIpc() {
   ipcMain.handle('schedule:pick-image', async () => {
     try { return await images.pickImage(settingsWin); } catch (e) { dialog.showErrorBox('Unable to use this image', e.message); return null; }
   });
+
+  ipcMain.handle('gallery:list', () => gallery.list());
+  ipcMain.handle('gallery:set', (_e, ref) => setGallery(ref));
 
   ipcMain.handle('log:open', () => shell.showItemInFolder(logFile));
 

@@ -227,6 +227,7 @@
     for (const [key, c] of controls) c.update(settings[key]);
     refreshDependencies();
     loadPreviewImage();
+    renderGallery();
     if (document.querySelector('.section.active[data-id="presets"]')) { renderPresets(); renderSchedule(); }
   }
 
@@ -312,7 +313,7 @@
       : img ? t('Windows wallpaper (automatic)')
       : settings.useSystemWallpaper ? t('Windows wallpaper not found – neutral gradient in use') : t('No image selected – neutral gradient in use');
     const meta = h('div', { class: 'image-meta' }, icon('image'), h('div', { class: 'image-name', title: img ? img.path : '' }, label),
-      img ? h('span', { class: 'preset-tag' }, custom ? t('Custom') : t('Windows')) : null);
+      img ? h('span', { class: 'preset-tag' }, img.gallery ? t('Gallery') : custom ? t('Custom') : t('Windows')) : null);
     const actions = h('div', { class: 'image-actions' },
       h('button', { class: 'btn primary', onclick: selectImage }, icon('upload'), custom ? t('Change image') : t('Select image')),
       h('button', { class: 'btn danger', onclick: removeImage, disabled: custom ? false : 'disabled', title: t('Remove the custom image (falls back to the Windows wallpaper)') }, icon('trash'), t('Remove')));
@@ -329,6 +330,50 @@
     applyRemote(s);
     toast('Background removed');
   }
+
+  /* ---------------------------------------------- custom: scene gallery */
+  const G = window.RainGlassGallery;
+  const galleryGrid = h('div', { class: 'preset-grid' });
+  const progress = new Map(); // scene id -> 0..1 while downloading
+  let scenes = G.SCENES.map((x) => ({ ...x, hasVideo: false }));
+  async function pickScene(ref) {
+    try {
+      applyRemote(await api.setGallery(ref));
+      toast(t('Background updated'));
+    } catch (e) {
+      toast(errText(e), true);
+    } finally {
+      progress.clear();
+      scenes = await api.galleryList();
+      renderGallery();
+    }
+  }
+  function renderGallery() {
+    galleryGrid.innerHTML = '';
+    const cur = G.parse(settings.backgroundPath);
+    for (const sc of scenes) {
+      const active = cur && cur.id === sc.id;
+      const p = progress.get(sc.id);
+      galleryGrid.append(h('div', { class: 'preset-card' + (active ? ' active' : '') },
+        h('div', { class: 'preset-thumb', style: `background-image:url(../../../assets/backgrounds/thumbs/${sc.id}.jpg)`, onclick: () => pickScene(G.ref(sc.id)), title: t(sc.name) }),
+        h('div', { class: 'preset-meta' }, h('div', { class: 'preset-name' }, t(sc.name)), active ? h('span', { class: 'preset-tag' }, cur.video ? t('Animated') : t('Image')) : null),
+        h('div', { class: 'preset-actions' },
+          h('button', { class: 'btn small', onclick: () => pickScene(G.ref(sc.id)) }, t('Image')),
+          h('button', { class: 'btn small', disabled: p !== undefined ? 'disabled' : false, onclick: () => { progress.set(sc.id, 0); renderGallery(); pickScene(G.ref(sc.id, true)); } },
+            icon('play'), p !== undefined ? Math.round(p * 100) + ' %' : (sc.hasVideo ? t('Animated') : t('Animated') + ' ↓')))));
+    }
+  }
+  api.onGalleryProgress(({ id, progress: pr }) => {
+    progress.set(id, pr);
+    const btns = galleryGrid.querySelectorAll('.preset-card');
+    const idx = scenes.findIndex((x) => x.id === id);
+    const b = btns[idx] && btns[idx].querySelectorAll('button')[1];
+    if (b) b.lastChild.textContent = Math.round(pr * 100) + ' %';
+  });
+  const galleryBox = h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, t('Gallery')),
+    buildControl(toggle('galleryMatchLook', t('Match the look'), { hint: t('Choosing a scene also applies the rain preset that suits it.') })),
+    h('div', { class: 'row' }, galleryGrid));
+  api.galleryList().then((list) => { scenes = list; renderGallery(); });
 
   /* ----------------------------------------------- custom: presets panel */
   const presetBox = h('div');
@@ -473,10 +518,23 @@
       const sel = h('select', { class: 'select' }, h('option', { value: '' }, t('Keep current look')),
         presets.map((p) => h('option', { value: p.name, selected: p.name === e.preset ? '' : false }, p.name)));
       sel.addEventListener('change', () => { list[i].preset = sel.value; saveSchedule(list); });
-      const imgBtn = h('button', { class: 'btn small', title: e.image || '', onclick: async () => {
-        const p = await api.pickScheduleImage(); if (p) { list[i].image = p; saveSchedule(list); }
-      } }, icon('image'), e.image ? e.image.split(/[\\/]/).pop().slice(0, 14) : t('Image'));
-      const clearImg = e.image ? h('button', { class: 'btn small ghost', title: t('Keep current image'), onclick: () => { list[i].image = ''; saveSchedule(list); } }, '×') : null;
+      // Image: keep / gallery scene (still or animated) / custom file
+      const G = window.RainGlassGallery;
+      const isFile = e.image && !G.parse(e.image);
+      const imgSel = h('select', { class: 'select', title: e.image || '' },
+        h('option', { value: '' }, t('Keep current image')),
+        G.SCENES.map((sc) => h('option', { value: G.ref(sc.id), selected: e.image === G.ref(sc.id) ? '' : false }, t(sc.name))),
+        G.SCENES.map((sc) => h('option', { value: G.ref(sc.id, true), selected: e.image === G.ref(sc.id, true) ? '' : false }, `${t(sc.name)} · ${t('Animated')}`)),
+        isFile ? h('option', { value: e.image, selected: '' }, e.image.split(/[\\/]/).pop().slice(0, 24)) : null,
+        h('option', { value: '__file' }, t('Custom file…')));
+      imgSel.addEventListener('change', async () => {
+        if (imgSel.value === '__file') {
+          const p = await api.pickScheduleImage();
+          if (p) list[i].image = p;
+        } else list[i].image = imgSel.value;
+        saveSchedule(list);
+      });
+      const imgBtn = imgSel, clearImg = null;
       const del = h('button', { class: 'btn small danger', title: t('Delete'), onclick: () => { list.splice(i, 1); saveSchedule(list); } }, icon('trash'));
       scheduleList.append(h('div', { class: 'schedule-row' }, time, sel, imgBtn, clearImg, del));
     });
@@ -546,7 +604,7 @@
     const item = h('div', { class: 'nav-item', 'data-id': sec.id, onclick: () => show(sec.id) }, icon(sec.id), h('span', {}, sec.title));
     nav.append(item);
     const el = h('section', { class: 'section', 'data-id': sec.id }, h('h2', {}, sec.title), h('p', { class: 'lead' }, sec.lead));
-    if (sec.custom === 'image') el.append(imageCard);
+    if (sec.custom === 'image') el.append(imageCard, galleryBox);
     if (sec.custom === 'presets') el.append(scheduleBox, presetBox);
     for (const g of sec.groups) el.append(h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, g.title), g.items.map(buildControl)));
     if (sec.custom === 'system') el.append(systemExtra);

@@ -108,6 +108,11 @@
     'E.g. foggy morning, steady rain in the afternoon, storm at night – with its own image.': 'Napr. hmlisté ráno, popoludní dážď, v noci búrka – aj s vlastným obrázkom.',
     'Keep current look': 'Ponechať aktuálny vzhľad', 'Keep current image': 'Ponechať aktuálny obrázok', 'Image': 'Obrázok', 'Add time': 'Pridať čas',
     'After the Storm': 'Po búrke', 'Snowy Window': 'Zasnežené okno', 'Frosty Morning': 'Mrazivé ráno',
+    'Gallery': 'Galéria', 'Animated': 'Animované', 'Match the look': 'Prispôsobiť vzhľad', 'Custom file…': 'Vlastný súbor…',
+    'Choosing a scene also applies the rain preset that suits it.': 'Výber scény nastaví aj predvoľbu dažďa, ktorá k nej sedí.',
+    'This animated background is not available yet.': 'Toto animované pozadie zatiaľ nie je k dispozícii.',
+    'Forest Cabin': 'Chatka v lese', 'Old Town at Night': 'Staré mesto v noci', 'Reading Nook': 'Kútik na čítanie', 'Misty Lake': 'Hmlisté jazero',
+    'Autumn Park': 'Jesenný park', 'Snowy Village': 'Zasnežená dedinka', 'Tokyo Alley': 'Tokijská ulička', 'Stormy Lighthouse': 'Maják v búrke',
     'Open Settings': 'Otvoriť nastavenia', 'Change background…': 'Zmeniť pozadie…', 'Quit': 'Ukončiť',
   };
 

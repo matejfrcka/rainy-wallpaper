@@ -39,7 +39,8 @@
       "package.json"
     ],
     "asarUnpack": [
-      "node_modules/koffi/**"
+      "node_modules/koffi/**",
+      "assets/backgrounds/**"
     ],
     "win": {
       "icon": "build/icon.ico",
