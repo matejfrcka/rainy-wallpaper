@@ -277,19 +277,44 @@ let taskbarTimer = null;
 let taskbarActive = false;
 const PERSONALIZE = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize';
 
-function regQueryLightTheme() {
+function regQuery(name) {
+  if (process.platform !== 'win32') return -1;
   try {
-    const out = require('child_process').execFileSync('reg', ['query', PERSONALIZE, '/v', 'SystemUsesLightTheme'], { windowsHide: true, encoding: 'utf8' });
-    const m = /SystemUsesLightTheme\s+REG_DWORD\s+0x([0-9a-f]+)/i.exec(out);
+    const out = require('child_process').execFileSync('reg', ['query', PERSONALIZE, '/v', name], { windowsHide: true, encoding: 'utf8' });
+    const m = new RegExp(name + '\\s+REG_DWORD\\s+0x([0-9a-f]+)', 'i').exec(out);
     return m ? parseInt(m[1], 16) : 0;
   } catch { return -1; }
 }
 
-function regSetLightTheme(value) {
+function regSet(name, value) {
   if (process.platform !== 'win32') return;
   try {
-    require('child_process').execFileSync('reg', ['add', PERSONALIZE, '/v', 'SystemUsesLightTheme', '/t', 'REG_DWORD', '/d', String(value), '/f'], { windowsHide: true });
-  } catch (e) { log('taskbar: could not change system theme: ' + e.message); }
+    require('child_process').execFileSync('reg', ['add', PERSONALIZE, '/v', name, '/t', 'REG_DWORD', '/d', String(value), '/f'], { windowsHide: true });
+  } catch (e) { log(`taskbar: could not change ${name}: ${e.message}`); }
+}
+const regQueryLightTheme = () => regQuery('SystemUsesLightTheme');
+const regSetLightTheme = (v) => regSet('SystemUsesLightTheme', v);
+
+/**
+ * See-through Start menu: Windows draws Start (and the taskbar flyouts) with
+ * its own blurred glass when "Transparency effects" is on. Apps cannot make
+ * Start fully clear, so this switches that Windows option on while the setting
+ * is enabled and puts the user's value back afterwards.
+ */
+function syncStartTransparency(quitting = false) {
+  if (process.platform !== 'win32') return;
+  const s = store.get();
+  const want = s.startTransparent && !quitting;
+  if (want && s.startSavedTransparency < 0) {
+    const cur = regQuery('EnableTransparency');
+    store.update({ startSavedTransparency: cur < 0 ? 0 : cur });
+    if (cur !== 1) { regSet('EnableTransparency', 1); win32.restoreTaskbar(); }
+    log('start menu: transparency on');
+  } else if (!want && s.startSavedTransparency >= 0) {
+    if (s.startSavedTransparency !== 1) { regSet('EnableTransparency', s.startSavedTransparency); win32.restoreTaskbar(); }
+    store.update({ startSavedTransparency: -1 });
+    log('start menu: transparency restored');
+  }
 }
 
 /**
@@ -333,7 +358,9 @@ function stopTaskbar() {
   clearInterval(taskbarTimer);
   const s = store && store.get();
   if (!s) return;
-  if (s.taskbarSavedTheme >= 0) { regSetLightTheme(s.taskbarSavedTheme); store.update({ taskbarSavedTheme: -1 }); store.flush(); }
+  if (s.taskbarSavedTheme >= 0) { regSetLightTheme(s.taskbarSavedTheme); store.update({ taskbarSavedTheme: -1 }); }
+  syncStartTransparency(true);
+  store.flush();
   if (taskbarActive) win32.restoreTaskbar();
 }
 
@@ -515,6 +542,7 @@ function init() {
   monitor.isScreensaver = () => screensaver.active;
   startScheduler();
   startTaskbar();
+  syncStartTransparency();
   startExtras();
   startMetrics();
   registerHotkeys();
@@ -677,6 +705,7 @@ function applySettings(partial, origin) {
   }
   if (changed.includes('hotkeysEnabled')) registerHotkeys();
   if (changed.includes('taskbarStyle') || changed.includes('taskbarLightIcons')) startTaskbar();
+  if (changed.includes('startTransparent')) syncStartTransparency();
   if (changed.some((k) => ['widgetMedia', 'rgbEnabled', 'wallpaperEnabled'].includes(k))) syncExtras();
   if (changed.includes('spanMonitors') || changed.includes('backgroundPath') || changed.includes('useSystemWallpaper')) wallpapers.updateSpan();
   if (changed.includes('schedule') || changed.includes('scheduleEnabled')) runSchedule(true);

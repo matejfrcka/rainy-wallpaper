@@ -40,6 +40,8 @@
   "Diagnostics": "Diagnosztika",
   "Sync rain and snow with real weather": "Eső és hó a valódi időjárás szerint",
   "Rain, snow and thunder follow the real weather at your location (Open-Meteo).": "Az eső, a hó és a zivatar a tartózkodási helyed valódi időjárását követi (Open-Meteo).",
+  "See-through Start menu": "Átlátszó Start menü",
+  "Turns on Windows' transparency effects so Start, the taskbar and its flyouts use blurred glass. Your setting is restored when you switch this off or close the app.": "Bekapcsolja a Windows átlátszósági effektusait, így a Start, a tálca és menüi homályos üvegből lesznek. Kikapcsoláskor vagy az alkalmazás bezárásakor a beállításod visszaáll.",
   "Live weather": "Élő időjárás",
   "Library": "Könyvtár",
   "Save current look": "Jelenlegi kinézet mentése",

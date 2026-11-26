@@ -40,6 +40,8 @@
   "Diagnostics": "Diagnostica",
   "Sync rain and snow with real weather": "Sincronizza pioggia e neve con il meteo reale",
   "Rain, snow and thunder follow the real weather at your location (Open-Meteo).": "Pioggia, neve e temporali seguono il meteo reale della tua zona (Open-Meteo).",
+  "See-through Start menu": "Menu Start trasparente",
+  "Turns on Windows' transparency effects so Start, the taskbar and its flyouts use blurred glass. Your setting is restored when you switch this off or close the app.": "Attiva gli effetti di trasparenza di Windows: Start, la barra delle applicazioni e i suoi menu diventano vetro sfocato. La tua impostazione torna com’era quando lo disattivi o chiudi l’app.",
   "Live weather": "Meteo in tempo reale",
   "Library": "Libreria",
   "Save current look": "Salva il look attuale",

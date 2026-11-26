@@ -40,6 +40,8 @@
   "Diagnostics": "Diagnostika",
   "Sync rain and snow with real weather": "Déšť a sníh podle skutečného počasí",
   "Rain, snow and thunder follow the real weather at your location (Open-Meteo).": "Déšť, sníh a bouřky se řídí skutečným počasím ve tvé lokalitě (Open-Meteo).",
+  "See-through Start menu": "Průhledná nabídka Start",
+  "Turns on Windows' transparency effects so Start, the taskbar and its flyouts use blurred glass. Your setting is restored when you switch this off or close the app.": "Zapne efekty průhlednosti Windows, takže Start, hlavní panel a jeho okna budou z rozmazaného skla. Po vypnutí nebo zavření aplikace se vrátí tvé nastavení.",
   "Live weather": "Počasí živě",
   "Library": "Knihovna",
   "Save current look": "Uložit aktuální vzhled",
