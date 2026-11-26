@@ -69,7 +69,6 @@ function load() {
       IsIconic: user32.func('bool __stdcall IsIconic(intptr_t hwnd)'),
       IsZoomed: user32.func('bool __stdcall IsZoomed(intptr_t hwnd)'),
       GetWindowTextLengthW: user32.func('int __stdcall GetWindowTextLengthW(intptr_t hwnd)'),
-      DwmSetWindowAttribute: dwmapi.func('int32 __stdcall DwmSetWindowAttribute(intptr_t hwnd, uint32 attr, _In_ int32 *value, uint32 size)'),
       DwmGetWindowAttribute: dwmapi.func('int32 __stdcall DwmGetWindowAttribute(intptr_t hwnd, uint32 attr, _Out_ int32 *value, uint32 size)'),
       CoInitializeEx: ole32.func('int32 __stdcall CoInitializeEx(void *reserved, uint32 flags)'),
       CoCreateInstance: ole32.func('int32 __stdcall CoCreateInstance(GUID *clsid, void *outer, uint32 ctx, GUID *iid, _Out_ void **ppv)'),
@@ -403,27 +402,38 @@ function setTaskbarStyle(style) {
 }
 
 /**
- * Glass title and command bar for File Explorer windows (Windows 11 22H2+):
- * sets the DWM system backdrop. 'acrylic' blurs what is behind the window
- * (the rain), 'mica' tints it with the wallpaper, 'off' gives the window back
- * to Windows. Already handled windows are skipped.
+ * See-through File Explorer windows on every Windows version: the window is
+ * made layered and drawn with the given opacity, so the rain shows through.
+ * 100 % gives the windows back exactly as they were.
  */
-const explorerApplied = new Map(); // hwnd -> backdrop value
-const BACKDROPS = { off: 0 /* auto */, mica: 2, acrylic: 3 };
-function setExplorerBackdrop(style) {
+const explorerApplied = new Map(); // hwnd -> { alpha, added: we set WS_EX_LAYERED }
+function setExplorerOpacity(percent) {
   const a = load();
   if (!a) return 0;
-  const value = BACKDROPS[style] ?? 0;
+  const alpha = Math.round(Math.max(40, Math.min(100, percent)) * 2.55);
   try {
     const seen = new Set();
     a.EnumWindows((hwnd) => {
       if (className(a, hwnd) !== 'CabinetWClass') return true;
       const key = Number(hwnd);
       seen.add(key);
-      if (explorerApplied.get(key) === value) return true;
-      if (value === 0 && !explorerApplied.has(key)) return true; // never touched → leave alone
-      a.DwmSetWindowAttribute(hwnd, 38 /* DWMWA_SYSTEMBACKDROP_TYPE */, [value], 4);
-      if (value === 0) explorerApplied.delete(key); else explorerApplied.set(key, value);
+      const prev = explorerApplied.get(key);
+      if (alpha >= 255) {
+        if (!prev) return true;
+        a.SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
+        if (prev.added) {
+          const ex = Number(a.GetWindowLongPtrW(hwnd, GWL_EXSTYLE)) >>> 0;
+          a.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex & ~WS_EX_LAYERED);
+        }
+        explorerApplied.delete(key);
+        return true;
+      }
+      if (prev && prev.alpha === alpha) return true;
+      let added = prev ? prev.added : false;
+      const ex = Number(a.GetWindowLongPtrW(hwnd, GWL_EXSTYLE)) >>> 0;
+      if (!(ex & WS_EX_LAYERED)) { a.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex | WS_EX_LAYERED); added = true; }
+      a.SetLayeredWindowAttributes(hwnd, 0, alpha, LWA_ALPHA);
+      explorerApplied.set(key, { alpha, added });
       return true;
     }, 0);
     for (const k of explorerApplied.keys()) if (!seen.has(k)) explorerApplied.delete(k);
@@ -536,4 +546,4 @@ function handleToNumber(handle) {
   try { return hwndFromBuffer(handle); } catch { return 0; }
 }
 
-module.exports = { setExplorerBackdrop, isLeftMouseDown, sendMediaKey, setTaskbarStyle, restoreTaskbar, getForegroundProcessName, getDesktopCursor, attachToDesktop, restack, getSystemWallpaperPath, getMonitorWallpapers, getCoveredMonitors, sendToBottom, getFullscreenState, refreshDesktop, handleToNumber, isAvailable: () => !!load() };
+module.exports = { setExplorerOpacity, isLeftMouseDown, sendMediaKey, setTaskbarStyle, restoreTaskbar, getForegroundProcessName, getDesktopCursor, attachToDesktop, restack, getSystemWallpaperPath, getMonitorWallpapers, getCoveredMonitors, sendToBottom, getFullscreenState, refreshDesktop, handleToNumber, isAvailable: () => !!load() };

@@ -368,15 +368,14 @@ function stopTaskbar() {
 /* ------------------------------------------------ glass Explorer windows */
 
 let explorerTimer = null;
-const explorerSupported = () => process.platform === 'win32' && Number(require('os').release().split('.')[2] || 0) >= 22621;
 function syncExplorerGlass(quitting = false) {
   clearInterval(explorerTimer);
   explorerTimer = null;
-  if (!explorerSupported()) return;
-  const style = quitting ? 'off' : store.get().explorerGlass;
-  win32.setExplorerBackdrop(style);
-  if (style !== 'off') explorerTimer = setInterval(() => win32.setExplorerBackdrop(store.get().explorerGlass), 1000);
-  log('explorer windows: ' + style);
+  if (process.platform !== 'win32') return;
+  const pct = quitting ? 100 : store.get().explorerOpacity;
+  win32.setExplorerOpacity(pct);
+  if (pct < 100) explorerTimer = setInterval(() => win32.setExplorerOpacity(store.get().explorerOpacity), 1000);
+  log('explorer windows: ' + pct + ' %');
 }
 
 /* ------------------------------------------- music, widget, RGB lighting */
@@ -722,7 +721,7 @@ function applySettings(partial, origin) {
   if (changed.includes('hotkeysEnabled')) registerHotkeys();
   if (changed.includes('taskbarStyle') || changed.includes('taskbarLightIcons')) startTaskbar();
   if (changed.includes('startTransparent')) syncStartTransparency();
-  if (changed.includes('explorerGlass')) syncExplorerGlass();
+  if (changed.includes('explorerOpacity')) syncExplorerGlass();
   if (changed.some((k) => ['widgetMedia', 'rgbEnabled', 'wallpaperEnabled'].includes(k))) syncExtras();
   if (changed.includes('spanMonitors') || changed.includes('backgroundPath') || changed.includes('useSystemWallpaper')) wallpapers.updateSpan();
   if (changed.includes('schedule') || changed.includes('scheduleEnabled')) runSchedule(true);

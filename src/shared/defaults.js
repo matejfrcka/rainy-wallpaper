@@ -77,7 +77,7 @@
     pauseOnBattery: false,
     startWithWindows: false,
     wallpaperEnabled: true,
-    explorerGlass: 'off',      // File Explorer title/command bar: 'off' | 'acrylic' | 'mica' (Windows 11 22H2+)
+    explorerOpacity: 100,      // File Explorer windows opacity in % (100 = untouched)
     startTransparent: false,   // Windows' glass ('Transparency effects') for the Start menu while on
     startSavedTransparency: -1, // user's EnableTransparency value to restore (-1 = nothing saved)
     modeLooks: {},             // rain / snow look remembered when switching between them
@@ -118,10 +118,10 @@
     streaks: [0, 100], volume: [0, 100], dayNight: [0, 100], fpsLimit: [0, 240], renderScale: [50, 100],
     windVolume: [0, 100], weatherLat: [-90, 90], weatherLon: [-180, 180],
     frost: [0, 100], parallax: [0, 100], screensaverMinutes: [1, 120],
-    thunderFrequency: [0, 100], musicSensitivity: [0, 100], musicGlow: [0, 100], taskbarSavedTheme: [-1, 1], startSavedTransparency: [-1, 1], snowIntensity: [0, 100], flakeSize: [0, 100], snowMelt: [0, 100], snowFall: [0, 100], settingsVersion: [0, 1000],
+    thunderFrequency: [0, 100], musicSensitivity: [0, 100], musicGlow: [0, 100], taskbarSavedTheme: [-1, 1], startSavedTransparency: [-1, 1], explorerOpacity: [40, 100], snowIntensity: [0, 100], flakeSize: [0, 100], snowMelt: [0, 100], snowFall: [0, 100], settingsVersion: [0, 1000],
   };
 
-  const ENUMS = { fitMode: ['fill', 'fit', 'stretch'], soundscape: ['window', 'roof', 'leaves', 'car'], precipitation: ['rain', 'snow'], taskbarStyle: ['default', 'clear', 'blur', 'acrylic'], explorerGlass: ['off', 'acrylic', 'mica'], onlinePhotoQuality: ['best', '1280', '640'], widgetPosition: ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center'], onlineVideoQuality: ['best', '2160', '1080', '720', '540'], language: ['auto', 'en', 'sk', 'cs', 'de', 'es', 'it', 'hu', 'fr'] };
+  const ENUMS = { fitMode: ['fill', 'fit', 'stretch'], soundscape: ['window', 'roof', 'leaves', 'car'], precipitation: ['rain', 'snow'], taskbarStyle: ['default', 'clear', 'blur', 'acrylic'], onlinePhotoQuality: ['best', '1280', '640'], widgetPosition: ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center'], onlineVideoQuality: ['best', '2160', '1080', '720', '540'], language: ['auto', 'en', 'sk', 'cs', 'de', 'es', 'it', 'hu', 'fr'] };
   const STRINGS = { weatherCity: 80, pauseApps: 600, pixabayKey: 80 };
 
   function sanitizeSchedule(list) {
