@@ -476,8 +476,9 @@ function registerIpc() {
 
   ipcMain.handle('weather:search', async (_e, city) => {
     const loc = await weather.geocode(String(city || '').slice(0, 80));
+    const wasOn = store.get().weatherSync;
     applySettings({ weatherCity: loc.name, weatherLat: loc.lat, weatherLon: loc.lon, weatherSync: true });
-    await updateWeather();
+    if (wasOn) await updateWeather(); // otherwise turning sync on already triggered an update
     return withImage(store.get());
   });
 

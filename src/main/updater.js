@@ -13,7 +13,9 @@ let onState = () => {};
 const state = { status: 'idle', version: null, error: null };
 
 function supported() {
-  return app.isPackaged && process.platform === 'win32' && !process.windowsStore && !process.env.PORTABLE_EXECUTABLE_DIR;
+  if (!app.isPackaged || process.platform !== 'win32' || process.windowsStore || process.env.PORTABLE_EXECUTABLE_DIR) return false;
+  // Only the NSIS installer ships app-update.yml (ZIP / unpacked builds don't).
+  return require('fs').existsSync(require('path').join(process.resourcesPath, 'app-update.yml'));
 }
 
 function init(opts) {
