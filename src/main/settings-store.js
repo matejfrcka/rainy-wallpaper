@@ -19,6 +19,12 @@ class SettingsStore {
       if (raw.dropletSize === 50) raw.dropletSize = 20;
       raw.settingsVersion = 2;
     }
+    // v3: new snow defaults; move users still on the old ones.
+    if (raw && typeof raw === 'object' && raw.settingsVersion === 2) {
+      const moved = { snowIntensity: [50, 34], snowMelt: [30, 56], snowFall: [60, 100], frost: [0, 28] };
+      for (const [k, [from, to]] of Object.entries(moved)) if (raw[k] === from || raw[k] === undefined) raw[k] = to;
+      raw.settingsVersion = 3;
+    }
     this.settings = sanitize(raw);
     const presets = this.readJson(this.presetsFile, []);
     this.userPresets = Array.isArray(presets) ? presets.filter((p) => p && typeof p.name === 'string' && p.values) : [];

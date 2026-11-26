@@ -98,7 +98,6 @@
   uniform vec2 uParallax;      // background offset (cursor parallax)
   uniform float uPZoom;        // background over-scan for parallax
   uniform float uPulse;        // music level: lights behind the glass pulse
-  uniform float uSnowPile;     // 0..1 snow drift building up on the bottom of the window
 
   float hash(vec2 p) {
     p = fract(p * vec2(123.34, 456.21));
@@ -295,26 +294,6 @@
       snowCol = mix(thin, snowCol, smoothstep(0.3, 0.95, dens));
       snowCol += step(0.985, hash(floor(uv * uRes / 2.0))) * 0.3 * uReflection * light;   // sparkles
       col = mix(col, snowCol, cover * 0.9);
-    }
-
-    // Snow drift on the bottom of the window, higher in the corners.
-    if (uSnowPile > 0.001) {
-      float ax = uv.x * uRes.x / uRes.y;
-      float contour = 0.085 + 0.05 * noise(vec2(ax * 2.5, 1.7)) + 0.012 * noise(vec2(ax * 9.0, 4.2)) + 0.004 * noise(vec2(ax * 40.0, 8.0));
-      float side = smoothstep(0.22, 0.0, min(uv.x, 1.0 - uv.x));
-      float h = uSnowPile * (contour + side * side * 0.14);
-      float d = h - uv.y;                                                   // > 0 inside the drift
-      float edgeSoft = 1.5 / uRes.y;
-      float pm = smoothstep(-edgeSoft, edgeSoft, d);
-      if (pm > 0.0) {
-        float depth = clamp(d / max(h, 0.001), 0.0, 1.0);
-        vec3 pc = vec3(0.93, 0.96, 1.0) * (0.55 + luma(gBlur) * 0.5);
-        pc *= 1.08 - depth * 0.3;                                           // lit surface, bluish shadow below
-        pc = mix(pc, pc * vec3(0.82, 0.88, 1.0), depth * 0.6);
-        pc *= 0.9 + 0.2 * noise(uv * uRes / 3.0);
-        pc += step(0.992, hash(floor(uv * uRes / 2.0) + 3.0)) * 0.35 * uReflection * (1.0 - depth);
-        col = mix(col, pc, pm);
-      }
     }
 
     // ---- glass reflections -----------------------------------------------

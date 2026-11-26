@@ -469,7 +469,6 @@
       gl.uniform2f(u.uParallax, (ex.parallax || [0, 0])[0], (ex.parallax || [0, 0])[1]);
       gl.uniform1f(u.uPZoom, ex.pzoom || 1);
       gl.uniform1f(u.uPulse, ex.pulse || 0);
-      gl.uniform1f(u.uSnowPile, ex.snowPile || 0);
       gl.uniform1f(u.uSnowMode, s.precipitation === 'snow' ? 1 : 0);
 
       const f = (k, d) => ((s[k] ?? d) / 100);
@@ -488,7 +487,7 @@
       gl.uniform1f(u.uRainAmt, f('rainIntensity', 55));
       gl.uniform1f(u.uFlash, flash || 0);
       gl.uniform1f(u.uDayNight, (f('dayNight', 50) - 0.5) * 2);
-      gl.uniform1f(u.uFrost, f('frost', 0));
+      gl.uniform1f(u.uFrost, s.precipitation === 'snow' ? f('frost', 28) : 0); // frost belongs to the snow settings
       this.draw(this.progGlass, null);
     }
 

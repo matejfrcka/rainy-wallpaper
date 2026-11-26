@@ -31,11 +31,11 @@
     merging: true,
     randomGeneration: true,
     precipitation: 'rain',     // 'rain' | 'snow'
-    frost: 0,                  // ice crystals on the glass (0 = off)
-    snowIntensity: 50,         // snow mode: how much snow sticks to the glass
+    frost: 28,                 // snow mode: ice crystals on the glass (0 = off)
+    snowIntensity: 34,         // snow mode: how much snow sticks to the glass
     flakeSize: 40,             // snow mode: size of the flakes on the glass
-    snowMelt: 30,              // snow mode: how fast stuck snow melts
-    snowFall: 60,              // snow mode: snow falling outside the window (0 = off)
+    snowMelt: 56,              // snow mode: how fast stuck snow melts
+    snowFall: 100,              // snow mode: snow falling outside the window (0 = off)
 
     // Glass
     refraction: 60,
@@ -77,7 +77,7 @@
     pauseOnBattery: false,
     startWithWindows: false,
     wallpaperEnabled: true,
-    settingsVersion: 2,        // bumped when defaults change (one-time migrations)
+    settingsVersion: 3,        // bumped when defaults change (one-time migrations)
     screensaverEnabled: false, // rain screensaver after inactivity
     screensaverMinutes: 10,
     screensaverClock: true,
