@@ -314,7 +314,7 @@
   "Desktop widget": "Widget sul desktop",
   "Clock": "Orologio",
   "Now playing": "In riproduzione",
-  "Shows the song playing in Spotify, the browser or another player.": "Mostra il brano in riproduzione su Spotify, nel browser o in un altro lettore.",
+  "Shows the song playing in Spotify, the browser or another player, with play/pause and skip buttons.": "Mostra il brano in riproduzione su Spotify, nel browser o in un altro lettore, con pulsanti play/pausa e salta.",
   "Position": "Posizione",
   "Top left": "In alto a sinistra",
   "Top right": "In alto a destra",

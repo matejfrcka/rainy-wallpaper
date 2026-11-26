@@ -364,29 +364,50 @@ function registerHotkeys() {
 
 /* --------------------------------------------------- desktop interaction */
 
-/** Forward the cursor to the wallpaper under it (30 Hz, only over the desktop). */
+/** Forward the cursor (and desktop clicks for the widget buttons) to the wallpaper under it (30 Hz, only over the desktop). */
 function startPointer() {
   let last = '';
+  let wasDown = false;
   setInterval(() => {
     const s = store.get();
-    if (!(s.mouseInteraction || s.parallax > 0) || !wallpapers.enabled || status.suspended || !wallpapers.windows.size) return;
-    let phys;
-    if (process.platform === 'win32') phys = win32.getDesktopCursor(wallpapers.ownHandles());
-    else phys = screen.getCursorScreenPoint();
+    const clicks = s.widgetMedia && !!mediaInfo;
+    if (!(s.mouseInteraction || s.parallax > 0 || clicks) || !wallpapers.enabled || status.suspended || !wallpapers.windows.size) { wasDown = false; return; }
+    const isWin = process.platform === 'win32';
+    const down = isWin && clicks ? win32.isLeftMouseDown() : false;
+    const pressed = down && !wasDown;
+    wasDown = down;
+    const phys = isWin ? win32.getDesktopCursor(wallpapers.ownHandles()) : screen.getCursorScreenPoint();
     if (!phys) return;
     const key = phys.x + ',' + phys.y;
-    if (key === last) return;
+    if (key === last && !pressed) return;
     last = key;
     for (const d of screen.getAllDisplays()) {
       const r = wallpapers.physicalRect(d);
       if (phys.x < r.x || phys.y < r.y || phys.x >= r.x + r.width || phys.y >= r.y + r.height) continue;
       const win = wallpapers.windows.get(d.id);
       if (win && !win.isDestroyed()) {
-        win.webContents.send('wallpaper:pointer', (phys.x - r.x) * (d.bounds.width / r.width), (phys.y - r.y) * (d.bounds.height / r.height));
+        const x = (phys.x - r.x) * (d.bounds.width / r.width), y = (phys.y - r.y) * (d.bounds.height / r.height);
+        win.webContents.send('wallpaper:pointer', x, y);
+        if (pressed) win.webContents.send('wallpaper:click', x, y);
       }
       break;
     }
   }, 33);
+}
+
+/** Play/pause, next or previous track in whatever player Windows' media controls point at. */
+let lastMediaCmd = { cmd: '', at: 0 };
+function mediaCommand(cmd) {
+  if (!['playpause', 'next', 'prev'].includes(cmd)) return;
+  const now = Date.now();
+  if (lastMediaCmd.cmd === cmd && now - lastMediaCmd.at < 400) return; // DOM click + desktop click for the same press
+  lastMediaCmd = { cmd, at: now };
+  if (process.platform !== 'win32') { log('media: ' + cmd + ' (Windows only)'); return; }
+  win32.sendMediaKey(cmd);
+  if (cmd === 'playpause' && mediaInfo) { // instant feedback; the next media poll confirms it
+    mediaInfo = { ...mediaInfo, playing: !mediaInfo.playing };
+    wallpapers.broadcast('widget:media', mediaInfo);
+  }
 }
 
 /* ----------------------------------------------------- weather & daylight */
@@ -724,6 +745,7 @@ function registerIpc() {
   });
   ipcMain.on('music:level', (e, level) => wallpapers.relayMusic(e.sender.id, Number(level) || 0));
   ipcMain.handle('widget:media', () => mediaInfo);
+  ipcMain.on('media:command', (_e, cmd) => mediaCommand(String(cmd)));
   ipcMain.on('wallpaper:fps', (_e, fps) => {
     status.fps = Number(fps) || 0;
     if (status.fps) fpsSamples.push(status.fps);

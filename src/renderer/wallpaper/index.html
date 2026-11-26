@@ -27,7 +27,15 @@
     .w-note { width: 26px; height: 26px; border-radius: 8px; flex: none; display: grid; place-items: center; background: rgba(255,255,255,0.14); }
     .w-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .w-artist { opacity: 0.75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .w-media.paused { opacity: 0.55; }
+    .w-media.paused .w-note, .w-media.paused .w-title, .w-media.paused .w-artist { opacity: 0.55; }
+    .w-controls { display: flex; gap: 6px; margin-top: 10px; }
+    .widget.center .w-controls { justify-content: center; }
+    .w-btn { width: 34px; height: 30px; border-radius: 10px; display: grid; place-items: center; cursor: pointer;
+      background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.12); transition: background .15s, transform .1s; }
+    .w-btn svg { width: 15px; height: 15px; fill: rgba(255,255,255,0.92); }
+    .w-btn.main { width: 40px; }
+    .w-btn.hover, .w-btn:hover { background: rgba(255,255,255,0.22); }
+    .w-btn.press { transform: scale(0.9); background: rgba(255,255,255,0.3); }
   </style>
 </head>
 <body>

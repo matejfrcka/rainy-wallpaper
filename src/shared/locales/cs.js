@@ -314,7 +314,7 @@
   "Desktop widget": "Widget na ploše",
   "Clock": "Hodiny",
   "Now playing": "Právě hraje",
-  "Shows the song playing in Spotify, the browser or another player.": "Zobrazí skladbu, která hraje ve Spotify, prohlížeči nebo jiném přehrávači.",
+  "Shows the song playing in Spotify, the browser or another player, with play/pause and skip buttons.": "Zobrazí skladbu, která hraje ve Spotify, prohlížeči nebo jiném přehrávači, s tlačítky přehrát/pauza a další/předchozí.",
   "Position": "Poloha",
   "Top left": "Vlevo nahoře",
   "Top right": "Vpravo nahoře",

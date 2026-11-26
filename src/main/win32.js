@@ -56,6 +56,9 @@ function load() {
       GetMonitorInfoW: user32.func('bool __stdcall GetMonitorInfoW(intptr_t monitor, _Inout_ MONITORINFO *info)'),
       SystemParametersInfoW: user32.func('bool __stdcall SystemParametersInfoW(uint32 action, uint32 param, _Inout_ uint16_t *pv, uint32 winIni)'),
       GetCursorPos: user32.func('bool __stdcall GetCursorPos(_Out_ POINT *pt)'),
+      GetAsyncKeyState: user32.func('int16_t __stdcall GetAsyncKeyState(int vk)'),
+      GetSystemMetrics: user32.func('int __stdcall GetSystemMetrics(int index)'),
+      keybd_event: user32.func('void __stdcall keybd_event(uint8_t vk, uint8_t scan, uint32_t flags, uintptr_t extra)'),
       WindowFromPoint: user32.func('intptr_t __stdcall WindowFromPoint(POINT pt)'),
       GetWindowThreadProcessId: user32.func('uint32 __stdcall GetWindowThreadProcessId(intptr_t hwnd, _Out_ uint32 *pid)'),
       OpenProcess: kernel32.func('intptr_t __stdcall OpenProcess(uint32 access, bool inherit, uint32 pid)'),
@@ -307,6 +310,33 @@ function getDesktopCursor(ownHandles = new Set()) {
   }
 }
 
+/** Is the (logical) left mouse button held down right now? */
+function isLeftMouseDown() {
+  const a = load();
+  if (!a) return false;
+  try {
+    const vk = a.GetSystemMetrics(23 /* SM_SWAPBUTTON */) ? 0x02 : 0x01;
+    return (a.GetAsyncKeyState(vk) & 0x8000) !== 0;
+  } catch {
+    return false;
+  }
+}
+
+const MEDIA_KEYS = { playpause: 0xB3, next: 0xB0, prev: 0xB1 };
+/** Press a media key – every player that listens to media keys (Spotify, browsers, VLC …) reacts. */
+function sendMediaKey(cmd) {
+  const a = load();
+  const vk = MEDIA_KEYS[cmd];
+  if (!a || !vk) return false;
+  try {
+    a.keybd_event(vk, 0, 1 /* EXTENDEDKEY */, 0);
+    a.keybd_event(vk, 0, 1 | 2 /* KEYUP */, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** File name (lower case, e.g. "photoshop.exe") of the app owning the foreground window. */
 function getForegroundProcessName() {
   const a = load();
@@ -472,4 +502,4 @@ function handleToNumber(handle) {
   try { return hwndFromBuffer(handle); } catch { return 0; }
 }
 
-module.exports = { setTaskbarStyle, restoreTaskbar, getForegroundProcessName, getDesktopCursor, attachToDesktop, restack, getSystemWallpaperPath, getMonitorWallpapers, getCoveredMonitors, sendToBottom, getFullscreenState, refreshDesktop, handleToNumber, isAvailable: () => !!load() };
+module.exports = { isLeftMouseDown, sendMediaKey, setTaskbarStyle, restoreTaskbar, getForegroundProcessName, getDesktopCursor, attachToDesktop, restack, getSystemWallpaperPath, getMonitorWallpapers, getCoveredMonitors, sendToBottom, getFullscreenState, refreshDesktop, handleToNumber, isAvailable: () => !!load() };

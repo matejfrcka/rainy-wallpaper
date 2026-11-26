@@ -314,7 +314,7 @@
   "Desktop widget": "Desktop-Widget",
   "Clock": "Uhr",
   "Now playing": "Läuft gerade",
-  "Shows the song playing in Spotify, the browser or another player.": "Zeigt den Titel, der in Spotify, im Browser oder einem anderen Player läuft.",
+  "Shows the song playing in Spotify, the browser or another player, with play/pause and skip buttons.": "Zeigt den Titel, der in Spotify, im Browser oder einem anderen Player läuft, mit Tasten für Wiedergabe/Pause und Überspringen.",
   "Position": "Position",
   "Top left": "Oben links",
   "Top right": "Oben rechts",

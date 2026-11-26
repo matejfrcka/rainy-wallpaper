@@ -53,6 +53,8 @@ contextBridge.exposeInMainWorld('rainApi', {
   musicLevel: (level) => ipcRenderer.send('music:level', level),
   onMedia: on('widget:media'),
   getMedia: () => ipcRenderer.invoke('widget:media'),
+  mediaCommand: (cmd) => ipcRenderer.send('media:command', cmd),
+  onClick: on('wallpaper:click'),
   onReset: on('wallpaper:reset'),
   onLightning: on('wallpaper:lightning'),
   lightning: (distance) => ipcRenderer.send('wallpaper:lightning', distance),

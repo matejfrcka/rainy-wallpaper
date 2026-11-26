@@ -89,7 +89,43 @@
       const ti = document.createElement('div'); ti.className = 'w-title'; ti.textContent = media.title;
       const ar = document.createElement('div'); ar.className = 'w-artist'; ar.textContent = media.artist || '';
       txt.append(ti, ar); row.append(note, txt); widget.append(row);
+      const ctr = document.createElement('div'); ctr.className = 'w-controls';
+      const ICON = {
+        prev: '<path d="M6 5h2v14H6zM20 5v14L9 12z"/>',
+        play: '<path d="M7 4v16l13-8z"/>',
+        pause: '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>',
+        next: '<path d="M16 5h2v14h-2zM4 5v14l11-7z"/>',
+      };
+      for (const [cmd, icon] of [['prev', 'prev'], ['playpause', media.playing ? 'pause' : 'play'], ['next', 'next']]) {
+        const b = document.createElement('div');
+        b.className = 'w-btn' + (cmd === 'playpause' ? ' main' : '');
+        b.dataset.cmd = cmd;
+        b.innerHTML = '<svg viewBox="0 0 24 24">' + ICON[icon] + '</svg>';
+        ctr.append(b);
+      }
+      widget.append(ctr);
     }
+  }
+  // Clicks: the wallpaper sits behind the desktop icons on Windows, so the main
+  // process forwards desktop clicks; DOM clicks cover other platforms.
+  function pressButton(el) {
+    const b = el && el.closest && el.closest('.w-btn');
+    if (!b) return false;
+    b.classList.add('press');
+    setTimeout(() => b.classList.remove('press'), 150);
+    api.mediaCommand(b.dataset.cmd);
+    return true;
+  }
+  widget.addEventListener('click', (e) => pressButton(e.target));
+  api.onClick((x, y) => pressButton(document.elementFromPoint(x, y)));
+  let hovered = null;
+  function hover(x, y) {
+    const el = document.elementFromPoint(x, y);
+    const b = el && el.closest ? el.closest('.w-btn') : null;
+    if (b === hovered) return;
+    if (hovered) hovered.classList.remove('hover');
+    hovered = b;
+    if (b) b.classList.add('hover');
   }
   renderWidget();
   setInterval(renderWidget, 15000);
@@ -106,7 +142,7 @@
   api.onSuspend((s) => engine.setSuspended(s));
   api.onHidden((h) => engine.setHidden(h));
   api.onSpan((span) => engine.setSpan(span));
-  api.onPointer((x, y) => engine.pointer(x, y));
+  api.onPointer((x, y) => { engine.pointer(x, y); if (isPrimary) hover(x, y); });
   api.onSleep((endsAt) => engine.setSleep(endsAt));
   api.getSleep().then((endsAt) => engine.setSleep(endsAt));
   api.onReset(() => engine.reset());

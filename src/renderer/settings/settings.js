@@ -139,7 +139,7 @@
         ] },
         { title: t('Desktop widget'), items: [
           toggle('widgetClock', t('Clock')),
-          toggle('widgetMedia', t('Now playing'), { hint: t('Shows the song playing in Spotify, the browser or another player.') }),
+          toggle('widgetMedia', t('Now playing'), { hint: t('Shows the song playing in Spotify, the browser or another player, with play/pause and skip buttons.') }),
           { type: 'select', key: 'widgetPosition', label: t('Position'), options: [['top-left', t('Top left')], ['top-right', t('Top right')], ['bottom-left', t('Bottom left')], ['bottom-right', t('Bottom right')], ['center', t('Center')]] },
         ] },
         { title: t('RGB lighting'), items: [

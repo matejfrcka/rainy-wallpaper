@@ -314,7 +314,7 @@
   "Desktop widget": "Asztali widget",
   "Clock": "Óra",
   "Now playing": "Most szól",
-  "Shows the song playing in Spotify, the browser or another player.": "Megmutatja a Spotifyban, a böngészőben vagy más lejátszóban szóló dalt.",
+  "Shows the song playing in Spotify, the browser or another player, with play/pause and skip buttons.": "Megmutatja a Spotifyban, a böngészőben vagy más lejátszóban szóló dalt, lejátszás/szünet és léptetés gombokkal.",
   "Position": "Pozíció",
   "Top left": "Bal fent",
   "Top right": "Jobb fent",

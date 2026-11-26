@@ -169,7 +169,7 @@
     "Desktop widget": "Widget na ploche",
     "Clock": "Hodiny",
     "Now playing": "Práve hrá",
-    "Shows the song playing in Spotify, the browser or another player.": "Zobrazí skladbu, ktorá hrá v Spotify, prehliadači alebo inom prehrávači.",
+    "Shows the song playing in Spotify, the browser or another player, with play/pause and skip buttons.": "Zobrazí skladbu, ktorá hrá v Spotify, prehliadači alebo inom prehrávači, s tlačidlami prehrať/pauza a ďalšia/predošlá.",
     "Position": "Poloha",
     "Top left": "Vľavo hore",
     "Top right": "Vpravo hore",

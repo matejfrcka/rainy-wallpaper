@@ -1,7 +1,7 @@
 'use strict';
 /**
  * "Now playing" from Windows' media controls (Spotify, browser, VLC …) via a
- * single long-running PowerShell process that prints JSON every 2 s.
+ * single long-running PowerShell process that prints JSON every second.
  * Windows only; started only while the widget wants it.
  */
 const { spawn } = require('child_process');
@@ -23,7 +23,7 @@ while ($true) {
   }
   [Console]::Out.WriteLine(($o | ConvertTo-Json -Compress))
   [Console]::Out.Flush()
-  Start-Sleep -Seconds 2
+  Start-Sleep -Milliseconds 1000
 }
 `;
 
