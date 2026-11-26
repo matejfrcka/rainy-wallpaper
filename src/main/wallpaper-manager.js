@@ -114,7 +114,7 @@ class WallpaperManager {
         this.attach.failures = 0;
         win.showInactive();
         win32.restack(host);
-        setTimeout(() => !win.isDestroyed() && win32.restack(host), 1000);
+        setTimeout(() => !win.isDestroyed() && win32.restack(host, this.log), 1000);
         win.__host = host;
         this.log(`display ${display.id}: attached (${host.mode}) ${rects[i].width}x${rects[i].height}`);
         this.sendState(win);

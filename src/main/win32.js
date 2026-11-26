@@ -35,6 +35,7 @@ function load() {
       EnumWindows: user32.func('bool __stdcall EnumWindows(EnumWindowsProc *cb, intptr_t lParam)'),
       SetParent: user32.func('intptr_t __stdcall SetParent(intptr_t child, intptr_t parent)'),
       GetParent: user32.func('intptr_t __stdcall GetParent(intptr_t hwnd)'),
+      GetWindow: user32.func('intptr_t __stdcall GetWindow(intptr_t hwnd, uint32 cmd)'),
       SetWindowPos: user32.func('bool __stdcall SetWindowPos(intptr_t hwnd, intptr_t after, int x, int y, int cx, int cy, uint32 flags)'),
       GetWindowLongPtrW: user32.func('intptr_t __stdcall GetWindowLongPtrW(intptr_t hwnd, int index)'),
       SetWindowLongPtrW: user32.func('intptr_t __stdcall SetWindowLongPtrW(intptr_t hwnd, int index, intptr_t value)'),
@@ -58,7 +59,8 @@ function load() {
 
 const SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_NOZORDER = 0x0004, SWP_NOACTIVATE = 0x0010, SWP_SHOWWINDOW = 0x0040;
 const HWND_BOTTOM = 1;
-const GWL_EXSTYLE = -20;
+const GWL_EXSTYLE = -20, GWL_STYLE = -16;
+const WS_CHILD = 0x40000000, WS_POPUP = 0x80000000, WS_CAPTION = 0x00c00000, WS_THICKFRAME = 0x00040000;
 const WS_EX_LAYERED = 0x00080000, WS_EX_NOACTIVATE = 0x08000000, WS_EX_TOOLWINDOW = 0x00000080;
 const LWA_ALPHA = 0x2;
 
@@ -127,17 +129,23 @@ async function attachToDesktop(handle, rect, origin, log = () => {}) {
   try {
     const parent = host.mode === 'progman' ? host.progman : host.parent;
     log(`attach: mode=${host.mode} hwnd=${hex(hwnd)} parent=${hex(parent)} defView=${hex(host.defView || host.iconHost)} workerw=${hex(host.workerw)}`);
-    const ex = Number(a.GetWindowLongPtrW(hwnd, GWL_EXSTYLE));
-    let newEx = ex | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW;
-    if (host.mode === 'progman') newEx |= WS_EX_LAYERED;
+    // A real child window (WS_CHILD instead of WS_POPUP) is required for
+    // SetParent + z-ordering below the icon layer to work.
+    const style = Number(a.GetWindowLongPtrW(hwnd, GWL_STYLE)) >>> 0;
+    const newStyle = ((style & ~(WS_POPUP | WS_CAPTION | WS_THICKFRAME)) | WS_CHILD) >>> 0;
+    a.SetWindowLongPtrW(hwnd, GWL_STYLE, newStyle);
+    const ex = Number(a.GetWindowLongPtrW(hwnd, GWL_EXSTYLE)) >>> 0;
+    let newEx = (ex | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW) >>> 0;
+    if (host.mode === 'progman') newEx = (newEx | WS_EX_LAYERED) >>> 0;
     a.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, newEx);
     if (host.mode === 'progman') a.SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
     a.SetParent(hwnd, parent);
-    const actual = Number(a.GetParent(hwnd));
-    if (actual !== Number(parent)) { log(`attach: SetParent failed (parent=${hex(actual)})`); return null; }
+    const actual = Number(a.GetAncestor(hwnd, 1 /* GA_PARENT */));
+    log(`attach: style 0x${style.toString(16)} -> 0x${newStyle.toString(16)}, parent now ${hex(actual)}`);
+    if (actual !== Number(parent)) { log('attach: SetParent failed'); return null; }
     host.hwnd = hwnd;
     host.rect = { x: rect.x - origin.x, y: rect.y - origin.y, width: rect.width, height: rect.height };
-    restack(host);
+    restack(host, log);
     return host;
   } catch (e) {
     log('attach: error ' + e.message);
@@ -146,7 +154,7 @@ async function attachToDesktop(handle, rect, origin, log = () => {}) {
 }
 
 /** (Re)apply position and z-order: our window must stay below the icon layer. */
-function restack(host) {
+function restack(host, log) {
   const a = load();
   if (!a || !host) return;
   try {
@@ -155,6 +163,13 @@ function restack(host) {
       // hWndInsertAfter = DefView → placed directly *below* the icons.
       a.SetWindowPos(hwnd, host.defView, rect.x, rect.y, rect.width, rect.height, SWP_NOACTIVATE | SWP_SHOWWINDOW);
       if (host.workerw) a.SetWindowPos(host.workerw, hwnd, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+      if (log) {
+        const order = [];
+        for (let w = a.GetWindow(host.defView, 0 /* GW_HWNDFIRST */), n = 0; w && n < 12; w = a.GetWindow(w, 2 /* GW_HWNDNEXT */), n++) {
+          order.push(Number(w) === Number(hwnd) ? 'RAINY' : className(a, w));
+        }
+        log('z-order in Progman (top→bottom): ' + order.join(' > '));
+      }
     } else {
       a.SetWindowPos(hwnd, 0, rect.x, rect.y, rect.width, rect.height, SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
     }
