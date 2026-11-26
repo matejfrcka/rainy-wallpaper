@@ -28,6 +28,8 @@
     glass: '<path d="M5 3h14v18H5z"/><path d="m8 7 3-3M8 12l7-7M11 16l5-5"/>',
     atmosphere: '<path d="M7 18a4 4 0 0 1-.7-7.9A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9z"/><path d="m11 13-2 4h3l-2 4"/>',
     presets: '<path d="M5 4h14v16l-7-4-7 4z"/>',
+    online: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+    search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
     system: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
     image: '<path d="M4 5h16v14H4z"/><path d="m4 16 5-5 4 4 3-3 4 4"/>',
     upload: '<path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/>',
@@ -134,6 +136,7 @@
         ] },
       ],
     },
+    { id: 'online', title: t('Online'), lead: t('Search millions of free photos and videos and use them as the background.'), custom: 'online', groups: [] },
     { id: 'presets', title: t('Presets'), lead: t('Save and load your favourite looks. Presets never change your image.'), custom: 'presets', groups: [] },
     {
       id: 'system', title: t('System'), lead: t('Desktop integration and performance.'),
@@ -327,6 +330,7 @@
     } else if (img) thumb.append(h('img', { src: img.url, alt: '' }));
     else thumb.append(h('div', { class: 'empty' }, icon('upload'), t('Select or drop an image'), h('span', { style: 'font-size:11px' }, state.formats.map((f) => f.toUpperCase()).join(' · '))));
     const custom = img && img.source === 'custom';
+    if (img && img.credit) img.name = `${img.credit.provider} · ${img.credit.user}`;
     const label = custom ? img.name
       : img ? t('Windows wallpaper (automatic)')
       : settings.useSystemWallpaper ? t('Windows wallpaper not found – neutral gradient in use') : t('No image selected – neutral gradient in use');
@@ -348,6 +352,110 @@
     applyRemote(s);
     toast('Background removed');
   }
+
+  /* ------------------------------------------- custom: online (Pixabay) */
+  const onl = { type: 'photo', query: '', page: 1, total: 0, items: [], busy: false, progress: new Map() };
+  const onlineGrid = h('div', { class: 'preset-grid online-grid' });
+  const onlineInfo = h('div', { class: 'row-hint' });
+  const onlineMore = h('button', { class: 'btn', style: 'display:none;margin-top:10px', onclick: () => onlineSearch(false) }, t('Load more'));
+  const onlineHistoryBox = h('div', { class: 'preset-grid online-grid' });
+  const searchInput = h('input', { type: 'text', placeholder: t('Search, e.g. rainy city night'), maxlength: 100 });
+  searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { onl.query = searchInput.value; onlineSearch(true); } });
+  const typeSeg = h('div', { class: 'segmented' });
+  for (const [val, label] of [['photo', t('Photos')], ['video', t('Videos')]]) {
+    const b = h('button', { onclick: () => { onl.type = val; renderTypeSeg(); onlineSearch(true); } }, label);
+    b.__v = val;
+    typeSeg.append(b);
+  }
+  function renderTypeSeg() { for (const b of typeSeg.children) b.classList.toggle('active', b.__v === onl.type); }
+  renderTypeSeg();
+  const CATS = [['rainy street', t('Rain')], ['city night', t('Night city')], ['forest fog', t('Forest')], ['mountains lake', t('Mountains')],
+    ['snow winter', t('Snow')], ['cozy cabin', t('Cozy')], ['autumn', t('Autumn')], ['ocean waves', t('Ocean')], ['neon', t('Neon')]];
+  const chips = h('div', { class: 'chips' }, CATS.map(([q, label]) => h('button', { class: 'chip-btn', onclick: () => { searchInput.value = q; onl.query = q; onlineSearch(true); } }, label)));
+
+  function onlineCard(it, fromHistory) {
+    const p = onl.progress.get(it.id);
+    const use = async () => {
+      if (onl.progress.has(it.id)) return;
+      onl.progress.set(it.id, 0);
+      renderOnline();
+      try {
+        applyRemote(await api.onlineUse(it));
+        toast(t('Background updated'));
+      } catch (e) {
+        toast(errText(e), true);
+      } finally {
+        onl.progress.delete(it.id);
+        renderOnline();
+        refreshOnlineHistory();
+      }
+    };
+    return h('div', { class: 'preset-card' },
+      h('div', { class: 'preset-thumb', style: `background-image:url(${it.thumb})`, onclick: use, title: it.tags || '' },
+        it.type === 'video' ? h('span', { class: 'thumb-badge' }, '▶ ' + (it.duration ? it.duration + ' s' : '')) : null,
+        p !== undefined ? h('span', { class: 'thumb-progress' }, Math.round(p * 100) + ' %') : null),
+      h('div', { class: 'preset-meta' },
+        h('div', { class: 'preset-name', title: it.user }, it.user || 'Pixabay'),
+        h('button', { class: 'btn small ghost', title: t('Open on Pixabay'), onclick: () => api.onlineOpen(it.page) }, icon('export'))));
+  }
+
+  function renderOnline() {
+    onlineGrid.innerHTML = '';
+    for (const it of onl.items) onlineGrid.append(onlineCard(it));
+    onlineMore.style.display = onl.items.length && onl.items.length < onl.total ? '' : 'none';
+  }
+
+  async function onlineSearch(reset) {
+    if (onl.busy) return;
+    onl.busy = true;
+    if (reset) { onl.page = 1; onl.items = []; renderOnline(); }
+    onlineInfo.textContent = t('Searching…');
+    try {
+      const res = await api.onlineSearch({ type: onl.type, query: onl.query, page: onl.page });
+      onl.total = res.total;
+      onl.items = onl.items.concat(res.items);
+      onl.page++;
+      onlineInfo.textContent = onl.items.length ? `${res.total} ${t('results')} · ${t('Images and videos from Pixabay')}` : t('Nothing found – try another word (English works best).');
+      renderOnline();
+    } catch (e) {
+      const msg = errText(e);
+      onlineInfo.textContent = msg === 'NO_KEY' ? t('No Pixabay API key – enter your own key below.') : msg;
+    } finally {
+      onl.busy = false;
+    }
+  }
+
+  async function refreshOnlineHistory() {
+    const list = await api.onlineHistory();
+    onlineHistoryBox.innerHTML = '';
+    for (const m of list.slice(0, 12)) {
+      onlineHistoryBox.append(h('div', { class: 'preset-card' },
+        h('div', { class: 'preset-thumb', style: `background-image:url(${m.thumb})`, title: m.user,
+          onclick: async () => { applyRemote(await api.setImagePath(m.file)); toast(t('Background updated')); } },
+        m.type === 'video' ? h('span', { class: 'thumb-badge' }, '▶') : null),
+        h('div', { class: 'preset-meta' }, h('div', { class: 'preset-name' }, m.user || 'Pixabay'))));
+    }
+    historyGroup.style.display = list.length ? '' : 'none';
+  }
+  api.onOnlineProgress(({ id, progress }) => {
+    onl.progress.set(id, progress);
+    const idx = onl.items.findIndex((x) => x.id === id);
+    const el = onlineGrid.children[idx] && onlineGrid.children[idx].querySelector('.thumb-progress');
+    if (el) el.textContent = Math.round(progress * 100) + ' %';
+  });
+
+  const historyGroup = h('div', { class: 'group glass', style: 'display:none' }, h('div', { class: 'group-title' }, t('Recently used')), h('div', { class: 'row' }, onlineHistoryBox));
+  const onlineBox = h('div', {},
+    h('div', { class: 'group glass' },
+      h('div', { class: 'row' },
+        h('div', { class: 'preset-save' }, searchInput, h('button', { class: 'btn primary', onclick: () => { onl.query = searchInput.value; onlineSearch(true); } }, icon('search'), t('Search'))),
+        h('div', { style: 'display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap' }, typeSeg, chips)),
+      h('div', { class: 'row' }, onlineInfo, onlineGrid, onlineMore)),
+    historyGroup,
+    h('div', { class: 'group glass' }, h('div', { class: 'group-title' }, t('Own API key (optional)')),
+      buildControl({ type: 'text', key: 'pixabayKey', label: t('Pixabay API key'), placeholder: t('Leave empty to use the built-in key'), hint: t('Get a free key at pixabay.com/api/docs after logging in.') })));
+  refreshOnlineHistory();
+  let onlineStarted = false;
 
   /* ---------------------------------------------- custom: scene gallery */
   const G = window.RainGlassGallery;
@@ -650,6 +758,7 @@
     }
     if (sec.custom === 'system') el.append(systemExtra);
     if (sec.custom === 'weather') el.append(sleepBox, weatherBox);
+    if (sec.custom === 'online') el.append(onlineBox);
     panel.append(el);
   }
   nav.append(h('div', { class: 'nav-spacer' }), h('div', { class: 'nav-foot' }, t('Double-click a slider to reset it')));
@@ -660,6 +769,7 @@
     for (const s of panel.querySelectorAll('.section')) s.classList.toggle('active', s.dataset.id === id);
     try { localStorage.setItem('tab', id); } catch { /* ignore */ }
     if (id === 'presets') generateThumbs();
+    if (id === 'online' && !onlineStarted) { onlineStarted = true; searchInput.value = 'night city lights'; onl.query = 'night city lights'; onlineSearch(true); }
   }
   let initialTab = 'background';
   try { initialTab = localStorage.getItem('tab') || initialTab; } catch { /* ignore */ }

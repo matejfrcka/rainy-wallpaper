@@ -17,6 +17,7 @@ const i18n = require('../shared/i18n');
 const updater = require('./updater');
 const { Screensaver } = require('./screensaver');
 const gallery = require('./gallery-manager');
+const online = require('./online');
 const t = (x) => i18n.t(x);
 const win32 = require('./win32');
 
@@ -578,7 +579,7 @@ function registerIpc() {
     const img = currentImage;
     const file = imagePathFor(displayId);
     if (!file) return null;
-    const meta = { name: img.name, path: file, source: img.source, key: img.key, gallery: img.gallery || null };
+    const meta = { name: img.name, path: file, source: img.source, key: img.key, gallery: img.gallery || null, credit: online.creditFor(file) };
     if (images.isVideo(file)) {
       // Videos are streamed through rainmedia:// instead of copied over IPC.
       return { ...meta, kind: 'video', mime: images.mimeOf(file), url: `rainmedia://media/${displayId || 'primary'}?k=${encodeURIComponent(img.key)}` };
@@ -651,6 +652,17 @@ function registerIpc() {
   ipcMain.handle('screensaver:test', () => { if (settingsWin) settingsWin.minimize(); setTimeout(() => screensaver.show(), 400); });
   ipcMain.handle('schedule:pick-image', async () => {
     try { return await images.pickImage(settingsWin); } catch (e) { dialog.showErrorBox('Unable to use this image', e.message); return null; }
+  });
+
+  ipcMain.handle('online:status', () => ({ hasKey: !!online.apiKey(store.get()) }));
+  ipcMain.handle('online:search', (_e, q) => online.search(store.get(), q || {}));
+  ipcMain.handle('online:history', () => online.history());
+  ipcMain.handle('online:use', async (_e, item) => {
+    const file = await online.download(item, (p) => sendToSettings('online:progress', { id: item.id, progress: p }));
+    return applySettings({ backgroundPath: file });
+  });
+  ipcMain.handle('online:open', (_e, url) => {
+    if (/^https:\/\/pixabay\.com\//.test(String(url))) shell.openExternal(url);
   });
 
   ipcMain.handle('gallery:list', () => gallery.list());

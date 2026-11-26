@@ -4,3 +4,4 @@ dist-we/
 *.log
 .DS_Store
 RainyGlass-Windows.zip
+src/main/build-keys.json

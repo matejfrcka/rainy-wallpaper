@@ -82,7 +82,8 @@
     screensaverClock: true,
     scheduleEnabled: false,    // time-of-day schedule (see `schedule`)
     schedule: [],              // [{ time: 'HH:MM', preset: name|'', image: path|'' }]
-    pauseApps: '',             // comma separated exe names that pause the wallpaper when in front
+    pauseApps: '',
+    pixabayKey: '',            // optional own Pixabay API key (built-in key used when empty)             // comma separated exe names that pause the wallpaper when in front
     hotkeysEnabled: true,      // Ctrl+Alt+R pause, Ctrl+Alt+W wallpaper on/off
     autoUpdate: true,
     language: 'auto',          // 'auto' | 'en' | 'sk' | 'cs' | 'de' | 'es' | 'it' | 'hu' | 'fr'
@@ -101,7 +102,7 @@
   };
 
   const ENUMS = { fitMode: ['fill', 'fit', 'stretch'], soundscape: ['window', 'roof', 'leaves', 'car'], precipitation: ['rain', 'snow'], language: ['auto', 'en', 'sk', 'cs', 'de', 'es', 'it', 'hu', 'fr'] };
-  const STRINGS = { weatherCity: 80, pauseApps: 600 };
+  const STRINGS = { weatherCity: 80, pauseApps: 600, pixabayKey: 80 };
 
   function sanitizeSchedule(list) {
     if (!Array.isArray(list)) return [];
