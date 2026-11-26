@@ -42,6 +42,8 @@
       this.nextLightning = 8 + Math.random() * 10;
       this.onLightning = null;    // callback(distance) – used to sync multiple monitors
       this.onFrame = null;        // callback(fps)
+      this.musicLevel = 0;        // 0..1 from MusicReactor (light pulsing)
+      this.lastMusicFlash = 0;
       this.fps = 0;
       this._frames = 0;
       this._fpsTime = 0;
@@ -84,6 +86,11 @@
         });
       }
       if (!this.running || this.paused || this.suspended) this.renderOnce();
+    }
+
+    setSpan(span) {
+      this.renderer.setSpan(span);
+      this.renderOnce();
     }
 
     setBackground(source) {
@@ -252,6 +259,22 @@
       this.sleepTimer = setTimeout(() => this.audio && this.audio.fadeOut(fade), Math.max(0, endsAt - Date.now() - fade * 1000));
     }
 
+    /** Music input: smooth level for pulsing, beats can trigger lightning. */
+    setMusicLevel(level) {
+      this.musicLevel = this.settings.musicReactive ? Math.max(0, Math.min(1, level || 0)) : 0;
+      if (this.paused || !this.running) this.renderOnce();
+    }
+
+    musicBeat(strength) {
+      if (!this.settings.musicReactive || !this.settings.musicLightning) return;
+      const now = performance.now();
+      if (strength < 0.35 || now - this.lastMusicFlash < 1200) return;
+      this.lastMusicFlash = now;
+      const distance = Math.max(0, 1 - strength);
+      this.lightning(distance, false);
+      if (this.onLightning) this.onLightning(distance);
+    }
+
     /** Desktop hidden behind windows: stop drawing but keep the ambience playing. */
     setHidden(h) {
       h = !!h;
@@ -310,7 +333,7 @@
       cur[0] += (tgt[0] - cur[0]) * k;
       cur[1] += (tgt[1] - cur[1]) * k;
       // Content moves against the cursor → depth behind the glass.
-      return { parallax: [cur[0] * amt * 0.05, -cur[1] * amt * 0.05], pzoom: 1 + amt * 0.06 };
+      return { parallax: [cur[0] * amt * 0.05, -cur[1] * amt * 0.05], pzoom: 1 + amt * 0.06, pulse: this.musicLevel * ((this.settings.musicGlow ?? 60) / 100) };
     }
 
     renderOnce() {

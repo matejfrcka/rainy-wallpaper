@@ -330,6 +330,12 @@
       this.sceneDirty = true;
     }
 
+    /** Span one background across monitors: { x, y, w, h, aspect } or null. */
+    setSpan(span) {
+      this.span = span || null;
+      this.sceneDirty = true;
+    }
+
     setSettings(s) {
       const prev = this.settings;
       this.settings = s;
@@ -403,6 +409,9 @@
       gl.uniform2f(u.uPos, (s.bgPosX ?? 50) / 100, (s.bgPosY ?? 50) / 100);
       gl.uniform1f(u.uZoom, (s.bgZoom ?? 100) / 100);
       gl.uniform1f(u.uBrightness, (s.bgBrightness ?? 100) / 100);
+      const sp = this.span;
+      gl.uniform4f(u.uSpan, sp ? sp.x : 0, sp ? sp.y : 0, sp ? sp.w : 1, sp ? sp.h : 1);
+      gl.uniform1f(u.uSpanAspect, sp ? sp.aspect : 0);
       this.draw(this.progCompose, compose);
 
       // Optional user blur of the background itself.
@@ -459,6 +468,7 @@
       const ex = extras || {};
       gl.uniform2f(u.uParallax, (ex.parallax || [0, 0])[0], (ex.parallax || [0, 0])[1]);
       gl.uniform1f(u.uPZoom, ex.pzoom || 1);
+      gl.uniform1f(u.uPulse, ex.pulse || 0);
       gl.uniform1f(u.uSnowMode, s.precipitation === 'snow' ? 1 : 0);
 
       const f = (k, d) => ((s[k] ?? d) / 100);

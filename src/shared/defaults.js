@@ -20,6 +20,7 @@
     bgPosX: 50,                // 0..100 (focal point when cropping)
     bgPosY: 50,
     bgZoom: 100,               // 100..200 %
+    spanMonitors: false,       // stretch one image across all monitors
 
     // Rain
     rainIntensity: 55,         // 0..100
@@ -84,6 +85,18 @@
     schedule: [],              // [{ time: 'HH:MM', preset: name|'', image: path|'' }]
     pauseApps: '',
     pixabayKey: '',
+    onlinePhotoQuality: 'best', // 'best' | '1280' | '640'
+    onlineVideoQuality: 'best', // 'best' | '2160' | '1080' | '720' | '540'
+    musicReactive: false,      // lights pulse / lightning with the music playing on the PC
+    musicSensitivity: 50,
+    musicGlow: 60,
+    musicLightning: true,
+    widgetClock: false,        // glass widget on the desktop: clock …
+    widgetMedia: false,        // … and the song that is playing
+    widgetPosition: 'top-right',
+    rgbEnabled: false,         // Razer Chroma: rain-blue glow, white flash on lightning
+    taskbarLightIcons: true,   // with a see-through taskbar: dark system theme so the clock/icons are white
+    taskbarSavedTheme: -1,     // internal: user's SystemUsesLightTheme while we changed it (-1 = untouched)
     taskbarStyle: 'default',   // 'default' | 'clear' | 'blur' | 'acrylic' – see the rain under the taskbar            // optional own Pixabay API key (built-in key used when empty)             // comma separated exe names that pause the wallpaper when in front
     hotkeysEnabled: true,      // Ctrl+Alt+R pause, Ctrl+Alt+W wallpaper on/off
     autoUpdate: true,
@@ -99,10 +112,10 @@
     streaks: [0, 100], volume: [0, 100], dayNight: [0, 100], fpsLimit: [0, 240], renderScale: [50, 100],
     windVolume: [0, 100], weatherLat: [-90, 90], weatherLon: [-180, 180],
     frost: [0, 100], parallax: [0, 100], screensaverMinutes: [1, 120],
-    thunderFrequency: [0, 100], snowIntensity: [0, 100], flakeSize: [0, 100], snowMelt: [0, 100], snowFall: [0, 100], settingsVersion: [0, 1000],
+    thunderFrequency: [0, 100], musicSensitivity: [0, 100], musicGlow: [0, 100], taskbarSavedTheme: [-1, 1], snowIntensity: [0, 100], flakeSize: [0, 100], snowMelt: [0, 100], snowFall: [0, 100], settingsVersion: [0, 1000],
   };
 
-  const ENUMS = { fitMode: ['fill', 'fit', 'stretch'], soundscape: ['window', 'roof', 'leaves', 'car'], precipitation: ['rain', 'snow'], taskbarStyle: ['default', 'clear', 'blur', 'acrylic'], language: ['auto', 'en', 'sk', 'cs', 'de', 'es', 'it', 'hu', 'fr'] };
+  const ENUMS = { fitMode: ['fill', 'fit', 'stretch'], soundscape: ['window', 'roof', 'leaves', 'car'], precipitation: ['rain', 'snow'], taskbarStyle: ['default', 'clear', 'blur', 'acrylic'], onlinePhotoQuality: ['best', '1280', '640'], widgetPosition: ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center'], onlineVideoQuality: ['best', '2160', '1080', '720', '540'], language: ['auto', 'en', 'sk', 'cs', 'de', 'es', 'it', 'hu', 'fr'] };
   const STRINGS = { weatherCity: 80, pauseApps: 600, pixabayKey: 80 };
 
   function sanitizeSchedule(list) {

@@ -61,6 +61,7 @@ function load() {
       OpenProcess: kernel32.func('intptr_t __stdcall OpenProcess(uint32 access, bool inherit, uint32 pid)'),
       QueryFullProcessImageNameW: kernel32.func('bool __stdcall QueryFullProcessImageNameW(intptr_t proc, uint32 flags, _Out_ uint16_t *buf, _Inout_ uint32 *size)'),
       CloseHandle: kernel32.func('bool __stdcall CloseHandle(intptr_t h)'),
+      SendMessageTimeoutStr: user32.func('intptr_t __stdcall SendMessageTimeoutW(intptr_t hwnd, uint32 msg, uintptr_t wParam, str16 lParam, uint32 flags, uint32 timeout, void *result)'),
       SetWindowCompositionAttribute: user32.func('bool __stdcall SetWindowCompositionAttribute(intptr_t hwnd, WINCOMPATTRDATA *data)'),
       IsIconic: user32.func('bool __stdcall IsIconic(intptr_t hwnd)'),
       IsZoomed: user32.func('bool __stdcall IsZoomed(intptr_t hwnd)'),
@@ -348,7 +349,7 @@ function setTaskbarStyle(style) {
       AccentState: states[style] ?? 0,
       AccentFlags: style === 'default' ? 0 : 2,
       // ABGR; acrylic needs a little alpha to show, clear/blur use none.
-      GradientColor: style === 'acrylic' ? 0x10101010 : 0x00000000,
+      GradientColor: style === 'acrylic' ? 0x55101010 : 0x00000000, // acrylic: light dark tint keeps icons readable
       AnimationId: 0,
     };
     if (!accentBuf) accentBuf = k.alloc('ACCENT_POLICY', 1);
@@ -366,6 +367,23 @@ function setTaskbarStyle(style) {
   } catch (e) {
     return 0;
   }
+}
+
+/**
+ * Give the taskbar back to Windows: Explorer re-applies its own look (incl.
+ * transparency / accent colour) when the theme-changed notifications arrive.
+ */
+function restoreTaskbar() {
+  const a = load();
+  if (!a) return;
+  try {
+    const bars = [];
+    const main = a.FindWindowW('Shell_TrayWnd', null);
+    if (main) bars.push(main);
+    a.EnumWindows((hwnd) => { if (className(a, hwnd) === 'Shell_SecondaryTrayWnd') bars.push(hwnd); return true; }, 0);
+    for (const h of bars) a.SendMessageTimeoutW(h, 0x031a /* WM_THEMECHANGED */, 0, 0, 0x2, 500, null);
+    a.SendMessageTimeoutStr(0xffff /* HWND_BROADCAST */, 0x001a /* WM_SETTINGCHANGE */, 0, 'ImmersiveColorSet', 0x2 /* ABORTIFHUNG */, 1000, null);
+  } catch { /* ignore */ }
 }
 
 /* ---------------- per-monitor wallpapers (IDesktopWallpaper COM) ---------------- */
@@ -454,4 +472,4 @@ function handleToNumber(handle) {
   try { return hwndFromBuffer(handle); } catch { return 0; }
 }
 
-module.exports = { setTaskbarStyle, getForegroundProcessName, getDesktopCursor, attachToDesktop, restack, getSystemWallpaperPath, getMonitorWallpapers, getCoveredMonitors, sendToBottom, getFullscreenState, refreshDesktop, handleToNumber, isAvailable: () => !!load() };
+module.exports = { setTaskbarStyle, restoreTaskbar, getForegroundProcessName, getDesktopCursor, attachToDesktop, restack, getSystemWallpaperPath, getMonitorWallpapers, getCoveredMonitors, sendToBottom, getFullscreenState, refreshDesktop, handleToNumber, isAvailable: () => !!load() };

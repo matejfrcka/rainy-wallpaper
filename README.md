@@ -33,6 +33,12 @@ The app has two separate layers:
 - **Thunder frequency**: from rare to very often.
 - **Schedule**: a different preset and image for each time of day, for example a foggy morning and a storm at night.
 - **Pause rules for apps**: the wallpaper pauses while a listed program (for example `photoshop.exe`) is in front.
+- **Music reactivity**: lights behind the glass pulse with whatever plays on the PC, and strong beats can trigger lightning (Windows system audio).
+- **Desktop widget**: a glass card on the desktop with a clock and the song that is playing (Spotify, browser, other players).
+- **Span across monitors**: one image stretched over all monitors.
+- **Razer Chroma**: keyboard, mouse and headset glow rain blue and flash white with every lightning strike (needs Razer Synapse).
+- **See-through taskbar**: clear, blurred or frosted, with white clock and icons. The taskbar keeps the look Windows gives it unless you change this.
+- **Online resolution**: choose the resolution of photos and videos downloaded from Pixabay.
 - **Languages**: English, Slovak, Czech, German, French, Spanish, Italian and Hungarian. The app follows the system language automatically, or you can choose one in *System*.
 - **Global shortcuts**: Ctrl+Alt+R pauses or resumes the rain, Ctrl+Alt+W turns the wallpaper on or off, Ctrl+Alt+S opens the settings.
 - **Automatic updates** from GitHub Releases (installed version). **Live performance** stats (FPS, CPU, RAM, GPU) are shown in *System* and written to the log.

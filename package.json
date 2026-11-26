@@ -1,7 +1,7 @@
 {
   "name": "rainy-glass-wallpaper",
   "productName": "Rainy Glass Wallpaper Engine",
-  "version": "1.3.1",
+  "version": "1.3.5",
   "description": "Live desktop wallpaper: realistic animated rain on glass over any image you choose.",
   "main": "src/main/main.js",
   "author": "Rainy Glass",
